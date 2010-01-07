@@ -71,10 +71,11 @@ public:
             }
             // Clean up.
             pFilterUnk->Release();
-            /* FIXME: it crashes with coreavc */
+            /* FIXME: it crashes (broken example on msdn?) */
             //FilterInfo.pGraph->Release(); 
             CoTaskMemFree(caGUID.pElems);
         }
+        return (!FAILED(res));
     }
 
 private:
