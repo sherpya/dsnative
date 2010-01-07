@@ -33,7 +33,7 @@ public:
         res = object->QueryInterface(IID_IBaseFilter, (LPVOID *) &m_filter);
         object->Release();
 
-        if (FAILED(res)) return FALSE;
+        return (!FAILED(res));
     }
 
     BOOL ShowPropertyPage(void)
