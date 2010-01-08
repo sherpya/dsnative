@@ -6,11 +6,11 @@ public:
     DSCodec::DSCodec(const char *filename, const GUID guid) : m_guid(guid), m_hDll(NULL), m_filter(NULL)
     {
         strncpy(m_fname, filename, MAX_PATH);
-    };
+    }
 
     BOOL LoadLibrary(void)
     {
-        return ((m_hDll = ::LoadLibraryA(m_fname)) != NULL);
+        return ((m_hDll = ::LoadLibrary(m_fname)) != NULL);
     }
 
     BOOL CreateFilter(void)
@@ -97,7 +97,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved)
     {
         case DLL_PROCESS_ATTACH:
         {
-            DisableThreadLibraryCalls((HMODULE) hModule);
+            DisableThreadLibraryCalls(hModule);
             return (OleInitialize(NULL) == S_OK);
         }
         case DLL_THREAD_ATTACH:
