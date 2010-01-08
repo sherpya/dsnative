@@ -3,7 +3,8 @@
 class DSCodec
 {
 public:
-    DSCodec::DSCodec(const char *filename, const GUID guid) : m_guid(guid), m_hDll(NULL), m_filter(NULL)
+    DSCodec::DSCodec(const char *filename, const GUID guid, BITMAPINFOHEADER *bih) :
+      m_guid(guid), m_bih(bih), m_hDll(NULL), m_filter(NULL)
     {
         strncpy(m_fname, filename, MAX_PATH);
     }
@@ -34,6 +35,11 @@ public:
         object->Release();
 
         return (!FAILED(res));
+    }
+
+    BOOL ReleaseFilter(void)
+    {
+        return m_filter->Release();
     }
 
     BOOL ShowPropertyPage(void)
@@ -82,13 +88,30 @@ private:
     HMODULE m_hDll;
     GUID m_guid;
     char m_fname[MAX_PATH + 1];
+    BITMAPINFOHEADER *m_bih;
     IBaseFilter *m_filter;
 };
 
 
 extern "C" DSCodec * WINAPI DSOpenCodec(const char *dll, const GUID guid, BITMAPINFOHEADER* bih)
 {
-    return NULL;
+    DSCodec *codec = new DSCodec(dll, guid, bih);
+    if (!codec->LoadLibrary())
+        return NULL;
+    if (!codec->CreateFilter())
+        return NULL;
+    return codec;
+}
+
+extern "C" void WINAPI DSCloseCodec(DSCodec *codec)
+{
+    codec->ReleaseFilter();
+    delete codec;
+}
+
+extern "C" BOOL WINAPI DSShowPropertyPage(DSCodec *codec)
+{
+    return codec->ShowPropertyPage();
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved)
