@@ -37,6 +37,9 @@ const char codec[] = "wmv8ds32.ax";
 //const GUID guid = { 0x4cb63e61, 0xc611, 0x11D0, { 0x83, 0xaa, 0x00, 0x00, 0x92, 0x90, 0x01, 0x84 } };
 //const char codec[] = "tm20dec.ax";
 
+//const GUID guid = { 0x5DFA20A4, 0xC343, 0x45DF, { 0xA4, 0x6E, 0xEC, 0x17, 0x11, 0xE4, 0xEE, 0x32 } };
+//const char codec[] = "diavc.ax";
+
 int main(void)
 {
     HMODULE hDs = LoadLibrary("dsnative.dll");
@@ -44,7 +47,8 @@ int main(void)
     funcDSCloseCodec DSCloseCodec = (funcDSCloseCodec) GetProcAddress(hDs, "DSCloseCodec");
     funcDSShowPropertyPage DSShowPropertyPage = (funcDSShowPropertyPage) GetProcAddress(hDs, "DSShowPropertyPage");
     DSCodec *c = DSOpenCodec(codec, guid, NULL);
-    DSShowPropertyPage(c);
+    //__asm { int 3 };
+    //DSShowPropertyPage(c);
     DSCloseCodec(c);
     return 0;
 }

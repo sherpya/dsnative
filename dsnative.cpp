@@ -23,7 +23,8 @@ class DSCodec
 {
 public:
     DSCodec::DSCodec(const char *filename, const GUID guid, BITMAPINFOHEADER *bih) :
-      m_guid(guid), m_bih(bih), m_hDll(NULL), m_filter(NULL)
+      m_guid(guid), m_bih(bih), m_hDll(NULL), m_filter(NULL),
+      m_iPin(NULL), m_oPin(NULL), m_iMem(NULL)
     {
         strncpy(m_fname, filename, MAX_PATH);
     }
@@ -59,6 +60,81 @@ public:
     BOOL ReleaseFilter(void)
     {
         return m_filter->Release();
+    }
+
+    BOOL SetInputType(void)
+    {
+        m_sOurType.majortype = MEDIATYPE_Video;
+
+        m_sOurType.subtype = MEDIATYPE_Video;
+        m_sOurType.subtype.Data1 = m_bih->biCompression;
+        //m_sOurType.subtype.Data1 = m_bih->biCompression = 0x31637661; //avc1
+
+        m_sOurType.formattype = FORMAT_VideoInfo;
+        m_sOurType.bFixedSizeSamples = FALSE;
+        m_sOurType.bTemporalCompression = TRUE;
+        m_sOurType.lSampleSize = 1;
+        m_sOurType.pUnk = NULL;
+
+        memset(&m_mp2vi, 0, sizeof(m_mp2vi));
+        m_mp2vi.hdr.rcSource.left = m_mp2vi.hdr.rcSource.top = 0;
+        m_mp2vi.hdr.rcSource.right = m_bih->biWidth;
+        m_mp2vi.hdr.rcSource.bottom = m_bih->biHeight;
+        m_mp2vi.hdr.rcTarget = m_mp2vi.hdr.rcSource;
+        m_mp2vi.hdr.dwBitRate = 0;
+        m_mp2vi.hdr.AvgTimePerFrame = 0;
+        m_mp2vi.hdr.dwPictAspectRatioX = m_bih->biWidth;
+        m_mp2vi.hdr.dwPictAspectRatioY = m_bih->biHeight;
+        memcpy(&m_mp2vi.hdr.bmiHeader, m_bih, sizeof(BITMAPINFOHEADER));
+        m_mp2vi.hdr.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+
+        m_sOurType.formattype = FORMAT_MPEG2Video;
+        m_sOurType.pbFormat = (BYTE *) &m_mp2vi;
+        m_sOurType.cbFormat = sizeof(MPEG2VIDEOINFO);
+        return TRUE;
+    }
+
+    BOOL EnumPins(void)
+    {
+        HRESULT res;
+        IEnumPins *enumpins;
+        res = m_filter->EnumPins(&enumpins);
+        enumpins->Reset();
+
+        IPin *pin;
+        PIN_INFO pInfo;
+
+        while ((res = enumpins->Next(1, &pin, NULL)) == S_OK)
+        {
+            pin->QueryPinInfo(&pInfo);
+            wprintf(L"Pin: %s - %s\n", pInfo.achName, (pInfo.dir == PINDIR_INPUT) ? L"Input" : L"Output");
+            if (pInfo.dir == PINDIR_INPUT)
+            {
+                m_iPin = pin;
+                m_iPin->AddRef();
+            }
+            else if (pInfo.dir == PINDIR_OUTPUT)
+            {
+                m_oPin = pin;
+                m_oPin->AddRef();
+            }
+            pin->Release();
+        }
+
+        enumpins->Release();
+        res = m_iPin->QueryInterface(IID_IMemInputPin, (LPVOID *) &m_iMem);
+        return TRUE;
+    }
+
+    BOOL CreateGraph(void)
+    {
+        this->EnumPins();
+        this->SetInputType();
+        HRESULT res;
+        DebugBreak();
+        res = m_iPin->QueryAccept(&m_sOurType);
+        //CBaseFilter s_filter = CBaseFilter();
+        return TRUE;
     }
 
     BOOL ShowPropertyPage(void)
@@ -109,6 +185,12 @@ private:
     char m_fname[MAX_PATH + 1];
     BITMAPINFOHEADER *m_bih;
     IBaseFilter *m_filter;
+
+    IPin *m_iPin;
+    IPin *m_oPin;
+    IMemInputPin *m_iMem;
+    AM_MEDIA_TYPE m_sOurType, m_sDestType;
+    MPEG2VIDEOINFO m_mp2vi;
 };
 
 
@@ -118,6 +200,8 @@ extern "C" DSCodec * WINAPI DSOpenCodec(const char *dll, const GUID guid, BITMAP
     if (!codec->LoadLibrary())
         return NULL;
     if (!codec->CreateFilter())
+        return NULL;
+    if (!codec->CreateGraph())
         return NULL;
     return codec;
 }

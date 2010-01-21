@@ -28,11 +28,23 @@
 #define WIN32_LEAN_AND_MEAN		// Exclude rarely-used stuff from Windows headers
 // Windows Header Files:
 #include <windows.h>
+#include <tchar.h>
 
 #include <dshow.h>
 #include <objbase.h>
 #include <uuids.h>
 
+//#include <streams.h>
+//#include <initguid.h>
+//#include <strsafe.h>
+
+#include <dvdmedia.h>
+
+#include <streams.h>
+#include <comdef.h>
+
 #include <commctrl.h>
+
+#include "inputpin.h"
 
 // TODO: reference additional headers your program requires here
