@@ -111,8 +111,6 @@ public:
         m_mp2vi.hdr.rcSource.right = m_bih->biWidth;
         m_mp2vi.hdr.rcSource.bottom = m_bih->biHeight;
         m_mp2vi.hdr.rcTarget = m_mp2vi.hdr.rcSource;
-        m_mp2vi.hdr.dwBitRate = 0;
-        m_mp2vi.hdr.AvgTimePerFrame = 0;
         m_mp2vi.hdr.dwPictAspectRatioX = m_bih->biWidth;
         m_mp2vi.hdr.dwPictAspectRatioY = m_bih->biHeight;
         memcpy(&m_mp2vi.hdr.bmiHeader, m_bih, sizeof(BITMAPINFOHEADER));
