@@ -64,23 +64,23 @@ public:
 
     BOOL SetOutputType(void)
     {
-	    m_sDestType.majortype = MEDIATYPE_Video;
-	    m_sDestType.subtype = MEDIASUBTYPE_RGB24;
-	    m_sDestType.formattype = FORMAT_VideoInfo2;
-	    m_sDestType.bFixedSizeSamples = TRUE;
-	    m_sDestType.bTemporalCompression = FALSE;
-	    m_sDestType.lSampleSize = 1;
+        m_sDestType.majortype = MEDIATYPE_Video;
+        m_sDestType.subtype = MEDIASUBTYPE_RGB24;
+        m_sDestType.formattype = FORMAT_VideoInfo2;
+        m_sDestType.bFixedSizeSamples = TRUE;
+        m_sDestType.bTemporalCompression = FALSE;
+        m_sDestType.lSampleSize = 1;
         m_sDestType.pUnk = 0;
 
         memset(&m_vi2, 0, sizeof(m_vi2));
-	    m_vi2.bmiHeader.biSizeImage = m_sDestType.lSampleSize;
+        m_vi2.bmiHeader.biSizeImage = m_sDestType.lSampleSize;
         m_vi2.bmiHeader.biBitCount = 24;
         m_vi2.bmiHeader.biBitCount = 0;
         m_vi2.bmiHeader.biWidth = m_bih->biWidth;
         m_vi2.bmiHeader.biHeight = m_bih->biHeight;
 
         m_sDestType.cbFormat = sizeof(VIDEOINFOHEADER2);
-	    m_sDestType.pbFormat = (BYTE *) &m_vi2;
+        m_sDestType.pbFormat = (BYTE *) &m_vi2;
 
         return TRUE;
     }
