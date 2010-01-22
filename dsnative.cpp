@@ -65,17 +65,47 @@ public:
     BOOL SetInputType(void)
     {
         m_sOurType.majortype = MEDIATYPE_Video;
-
         m_sOurType.subtype = MEDIATYPE_Video;
         m_sOurType.subtype.Data1 = m_bih->biCompression;
-        //m_sOurType.subtype.Data1 = m_bih->biCompression = 0x31637661; //avc1
-
         m_sOurType.formattype = FORMAT_VideoInfo;
         m_sOurType.bFixedSizeSamples = FALSE;
         m_sOurType.bTemporalCompression = TRUE;
         m_sOurType.lSampleSize = 1;
         m_sOurType.pUnk = NULL;
 
+        switch (m_bih->biCompression)
+        {
+            case mmioFOURCC('H', '2', '6', '4'):
+            case mmioFOURCC('h', '2', '6', '4'):
+            case mmioFOURCC('X', '2', '6', '4'):
+            case mmioFOURCC('x', '2', '6', '4'):
+            case mmioFOURCC('A', 'V', 'C', '1'):
+            case mmioFOURCC('a', 'v', 'c', '1'):
+            case mmioFOURCC('d', 'a', 'v', 'c'):
+            case mmioFOURCC('D', 'A', 'V', 'C'):
+            case mmioFOURCC('V', 'S', 'S', 'H'):
+                return SetInputMPEG2();
+        }
+        return SetInputVideoInfo();
+    }
+
+    BOOL SetInputVideoInfo(void)
+    {
+        memset(&m_vi, 0, sizeof(m_vi));
+        memcpy(&m_vi.bmiHeader, m_bih, m_bih->biSize);
+        m_vi.rcSource.left = m_vi.rcSource.top = 0;
+        m_vi.rcSource.right = m_bih->biWidth;
+        m_vi.rcSource.bottom = m_bih->biHeight;
+        m_vi.rcTarget = m_vi.rcSource;
+
+        m_sOurType.formattype = FORMAT_VideoInfo;
+        m_sOurType.pbFormat = (BYTE *) &m_vi;
+        m_sOurType.cbFormat = sizeof(VIDEOINFOHEADER);
+        return TRUE;
+    }
+
+    BOOL SetInputMPEG2(void)
+    {
         memset(&m_mp2vi, 0, sizeof(m_mp2vi));
         m_mp2vi.hdr.rcSource.left = m_mp2vi.hdr.rcSource.top = 0;
         m_mp2vi.hdr.rcSource.right = m_bih->biWidth;
@@ -191,6 +221,7 @@ private:
     IMemInputPin *m_iMem;
     AM_MEDIA_TYPE m_sOurType, m_sDestType;
     MPEG2VIDEOINFO m_mp2vi;
+    VIDEOINFOHEADER m_vi;
 };
 
 
