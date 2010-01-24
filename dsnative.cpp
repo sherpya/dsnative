@@ -23,8 +23,8 @@ class DSCodec
 {
 public:
     DSCodec::DSCodec(const char *filename, const GUID guid, BITMAPINFOHEADER *bih) :
-      m_guid(guid), m_bih(bih), m_hDll(NULL), m_filter(NULL),
-      m_iPin(NULL), m_oPin(NULL), m_iMem(NULL)
+      m_guid(guid), m_bih(bih), m_hDll(NULL), m_pFilter(NULL),
+      m_pInputPin(NULL), m_pOutputPin(NULL), m_pImp(NULL)
     {
         strncpy(m_fname, filename, MAX_PATH);
     }
@@ -51,7 +51,7 @@ public:
 
         if (FAILED(res)) return FALSE;
 
-        res = object->QueryInterface(IID_IBaseFilter, (LPVOID *) &m_filter);
+        res = object->QueryInterface(IID_IBaseFilter, (LPVOID *) &m_pFilter);
         object->Release();
 
         return (!FAILED(res));
@@ -59,42 +59,42 @@ public:
 
     BOOL ReleaseFilter(void)
     {
-        return m_filter->Release();
+        return m_pFilter->Release();
     }
 
     BOOL SetOutputType(void)
     {
-        m_sDestType.majortype = MEDIATYPE_Video;
-        m_sDestType.subtype = MEDIASUBTYPE_RGB24;
-        m_sDestType.formattype = FORMAT_VideoInfo2;
-        m_sDestType.bFixedSizeSamples = TRUE;
-        m_sDestType.bTemporalCompression = FALSE;
-        m_sDestType.lSampleSize = 1;
-        m_sDestType.pUnk = 0;
+        m_pDestType.majortype = MEDIATYPE_Video;
+        m_pDestType.subtype = MEDIASUBTYPE_RGB24;
+        m_pDestType.formattype = FORMAT_VideoInfo2;
+        m_pDestType.bFixedSizeSamples = TRUE;
+        m_pDestType.bTemporalCompression = FALSE;
+        m_pDestType.lSampleSize = 1;
+        m_pDestType.pUnk = 0;
 
         memset(&m_vi2, 0, sizeof(m_vi2));
-        m_vi2.bmiHeader.biSizeImage = m_sDestType.lSampleSize;
+        m_vi2.bmiHeader.biSizeImage = m_pDestType.lSampleSize;
         m_vi2.bmiHeader.biBitCount = 24;
         m_vi2.bmiHeader.biBitCount = 0;
         m_vi2.bmiHeader.biWidth = m_bih->biWidth;
         m_vi2.bmiHeader.biHeight = m_bih->biHeight;
 
-        m_sDestType.cbFormat = sizeof(VIDEOINFOHEADER2);
-        m_sDestType.pbFormat = (BYTE *) &m_vi2;
+        m_pDestType.cbFormat = sizeof(VIDEOINFOHEADER2);
+        m_pDestType.pbFormat = (BYTE *) &m_vi2;
 
         return TRUE;
     }
 
     BOOL SetInputType(void)
     {
-        m_sOurType.majortype = MEDIATYPE_Video;
-        m_sOurType.subtype = MEDIATYPE_Video;
-        m_sOurType.subtype.Data1 = m_bih->biCompression;
-        m_sOurType.formattype = FORMAT_VideoInfo;
-        m_sOurType.bFixedSizeSamples = FALSE;
-        m_sOurType.bTemporalCompression = TRUE;
-        m_sOurType.lSampleSize = 1;
-        m_sOurType.pUnk = NULL;
+        m_pOurType.majortype = MEDIATYPE_Video;
+        m_pOurType.subtype = MEDIATYPE_Video;
+        m_pOurType.subtype.Data1 = m_bih->biCompression;
+        m_pOurType.formattype = FORMAT_VideoInfo;
+        m_pOurType.bFixedSizeSamples = FALSE;
+        m_pOurType.bTemporalCompression = TRUE;
+        m_pOurType.lSampleSize = 1;
+        m_pOurType.pUnk = NULL;
 
         switch (m_bih->biCompression)
         {
@@ -121,9 +121,9 @@ public:
         m_vi.rcSource.bottom = m_bih->biHeight;
         m_vi.rcTarget = m_vi.rcSource;
 
-        m_sOurType.formattype = FORMAT_VideoInfo;
-        m_sOurType.pbFormat = (BYTE *) &m_vi;
-        m_sOurType.cbFormat = sizeof(VIDEOINFOHEADER);
+        m_pOurType.formattype = FORMAT_VideoInfo;
+        m_pOurType.pbFormat = (BYTE *) &m_vi;
+        m_pOurType.cbFormat = sizeof(VIDEOINFOHEADER);
         return TRUE;
     }
 
@@ -139,9 +139,9 @@ public:
         memcpy(&m_mp2vi.hdr.bmiHeader, m_bih, sizeof(BITMAPINFOHEADER));
         m_mp2vi.hdr.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
 
-        m_sOurType.formattype = FORMAT_MPEG2Video;
-        m_sOurType.pbFormat = (BYTE *) &m_mp2vi;
-        m_sOurType.cbFormat = sizeof(MPEG2VIDEOINFO);
+        m_pOurType.formattype = FORMAT_MPEG2Video;
+        m_pOurType.pbFormat = (BYTE *) &m_mp2vi;
+        m_pOurType.cbFormat = sizeof(MPEG2VIDEOINFO);
         return TRUE;
     }
 
@@ -149,7 +149,7 @@ public:
     {
         HRESULT res;
         IEnumPins *enumpins;
-        res = m_filter->EnumPins(&enumpins);
+        res = m_pFilter->EnumPins(&enumpins);
         enumpins->Reset();
 
         IPin *pin;
@@ -161,19 +161,19 @@ public:
             wprintf(L"Pin: %s - %s\n", pInfo.achName, (pInfo.dir == PINDIR_INPUT) ? L"Input" : L"Output");
             if (pInfo.dir == PINDIR_INPUT)
             {
-                m_iPin = pin;
-                m_iPin->AddRef();
+                m_pInputPin = pin;
+                m_pInputPin->AddRef();
             }
             else if (pInfo.dir == PINDIR_OUTPUT)
             {
-                m_oPin = pin;
-                m_oPin->AddRef();
+                m_pOutputPin = pin;
+                m_pOutputPin->AddRef();
             }
             pin->Release();
         }
 
         enumpins->Release();
-        res = m_iPin->QueryInterface(IID_IMemInputPin, (LPVOID *) &m_iMem);
+        res = m_pInputPin->QueryInterface(IID_IMemInputPin, (LPVOID *) &m_pImp);
         return TRUE;
     }
 
@@ -184,34 +184,33 @@ public:
         this->SetInputType();
         this->SetOutputType();
 
-        res = m_iPin->QueryAccept(&m_sOurType);
-
-        DebugBreak();
+        res = m_pInputPin->QueryAccept(&m_pOurType);
 
         CBaseFilter2 *basef = new CBaseFilter2();
         CBasePin *remotep = basef->GetPin(1);
         remotep->AddRef();
-        res = m_iPin->ReceiveConnection(remotep, &m_sOurType); 
+        res = m_pInputPin->ReceiveConnection(remotep, &m_pOurType); 
 
         // Create receiver
         //CBaseFilter s_filter = CBaseFilter();
-        res = m_oPin->QueryAccept(&m_sDestType);
+        res = m_pOutputPin->QueryAccept(&m_pDestType);
+        res = m_pImp->NotifyAllocator(m_pAll, FALSE);
 
         return TRUE;
     }
 
     BOOL ShowPropertyPage(void)
     {
-        if (!m_filter) return FALSE;
+        if (!m_pFilter) return FALSE;
         HRESULT res;
         ISpecifyPropertyPages *pProp;
-        if ((res = m_filter->QueryInterface(IID_ISpecifyPropertyPages, (LPVOID *) &pProp)) == S_OK)
+        if ((res = m_pFilter->QueryInterface(IID_ISpecifyPropertyPages, (LPVOID *) &pProp)) == S_OK)
         {
             // Get the filter's name and IUnknown pointer.
             FILTER_INFO FilterInfo;
-            res = m_filter->QueryFilterInfo(&FilterInfo); 
+            res = m_pFilter->QueryFilterInfo(&FilterInfo); 
             IUnknown *pFilterUnk;
-            res = m_filter->QueryInterface(IID_IUnknown, (LPVOID *) &pFilterUnk);
+            res = m_pFilter->QueryInterface(IID_IUnknown, (LPVOID *) &pFilterUnk);
             CAUUID caGUID;
             pProp->GetPages(&caGUID);
             pProp->Release();
@@ -247,12 +246,13 @@ private:
     GUID m_guid;
     char m_fname[MAX_PATH + 1];
     BITMAPINFOHEADER *m_bih;
-    IBaseFilter *m_filter;
+    IBaseFilter *m_pFilter;
 
-    IPin *m_iPin;
-    IPin *m_oPin;
-    IMemInputPin *m_iMem;
-    AM_MEDIA_TYPE m_sOurType, m_sDestType;
+    IPin *m_pInputPin;
+    IPin *m_pOutputPin;
+    IMemInputPin *m_pImp;
+    IMemAllocator *m_pAll;
+    AM_MEDIA_TYPE m_pOurType, m_pDestType;
     MPEG2VIDEOINFO m_mp2vi;
     VIDEOINFOHEADER m_vi;
     VIDEOINFOHEADER2 m_vi2;
