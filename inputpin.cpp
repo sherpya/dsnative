@@ -18,44 +18,32 @@
 */
 
 #include "stdafx.h"
-#include <initguid.h>
 
-class CBaseFilter2;
-class CRemotePin2;
-
-class CRemotePin2 : public CBaseOutputPin
+CRemotePin2::CRemotePin2(HRESULT *phr, CBaseFilter2 *pFilter, CCritSec *pLock) : CBasePin(NAME("CRemotePin2"), pFilter, pLock, phr, L"Output", PINDIR_OUTPUT)
 {
-    CRemotePin2(CBaseFilter2 *parent);
-    DECLARE_IUNKNOWN
-    CBaseFilter2 *m_parent;
-    IPin *m_pin;
+    fprintf(stderr, "CRemotePin2::CRemotePin2\n");
+}
 
-    STDMETHODIMP QueryInterface(REFIID riid, void *ppvObject) { return S_OK; }
-    //ULONG STDMETHODCALLTYPE AddRef(void) { return 0; }
-    //ULONG STDMETHODCALLTYPE Release(void) { return 0; }
-};
-
-class CBaseFilter2 : public IMediaFilter
+HRESULT CRemotePin2::CheckMediaType(const CMediaType *)
 {
-    STDMETHODIMP QueryInterface(const IID &riid, void **ppvObject)
-    {
-        return S_OK;
-    }
+    fprintf(stderr, "CRemotePin2::CheckMediaType\n");
+    return E_NOTIMPL;
+}
 
-    STDMETHODIMP GetClassID(CLSID *pClassID) { return S_OK; }
-    STDMETHODIMP Stop(void) { return S_OK; }
-    STDMETHODIMP Pause(void) { return S_OK; }
-    STDMETHODIMP Run(REFERENCE_TIME tStart) { return S_OK; }
-    STDMETHODIMP GetState(DWORD dwMilliSecsTimeout, FILTER_STATE *State) { return S_OK; }
-    STDMETHODIMP SetSyncSource(IReferenceClock *pClock) { return S_OK; }
-    STDMETHODIMP GetSyncSource(IReferenceClock **pClock) { return S_OK; }
-
-    ULONG STDMETHODCALLTYPE AddRef(void) { return 0; }
-    ULONG STDMETHODCALLTYPE Release(void) { return 0; }
-
-};
-
-void a()
+CBaseFilter2::CBaseFilter2() : CBaseFilter(NAME("CBaseFilter2"), NULL, &m_csFilter, GUID_NULL)
 {
-    CBaseFilter2 a;
+    fprintf(stderr, "CBaseFilter2::CBaseFilter2\n");
+    m_pin = new CRemotePin2(&m_hr, this, &m_csFilter);
+}
+
+int CBaseFilter2::GetPinCount(void)
+{
+    fprintf(stderr, "CBaseFilter2::GetPinCount\n");
+    return 1;
+}
+
+CBasePin *CBaseFilter2::GetPin(int n)
+{
+    fprintf(stderr, "CBaseFilter2::GetPin\n");
+    return this->m_pin;
 }

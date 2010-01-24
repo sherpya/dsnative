@@ -184,9 +184,15 @@ public:
         this->SetInputType();
         this->SetOutputType();
 
+        res = m_iPin->QueryAccept(&m_sOurType);
+
         DebugBreak();
 
-        res = m_iPin->QueryAccept(&m_sOurType);
+        CBaseFilter2 *basef = new CBaseFilter2();
+        CBasePin *remotep = basef->GetPin(1);
+        remotep->AddRef();
+        res = m_iPin->ReceiveConnection(remotep, &m_sOurType); 
+
         // Create receiver
         //CBaseFilter s_filter = CBaseFilter();
         res = m_oPin->QueryAccept(&m_sDestType);
