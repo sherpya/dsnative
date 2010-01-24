@@ -24,7 +24,8 @@ class DSCodec
 public:
     DSCodec::DSCodec(const char *filename, const GUID guid, BITMAPINFOHEADER *bih) :
       m_guid(guid), m_bih(bih), m_hDll(NULL), m_pFilter(NULL),
-      m_pInputPin(NULL), m_pOutputPin(NULL), m_pImp(NULL)
+      m_pInputPin(NULL), m_pOutputPin(NULL), m_pOurInput(NULL), m_pOurOutput(NULL),
+      m_pImp(NULL), m_pSrcFilter(NULL), m_pParentFilter(NULL)
     {
         strncpy(m_fname, filename, MAX_PATH);
     }
@@ -185,11 +186,27 @@ public:
         this->SetOutputType();
 
         res = m_pInputPin->QueryAccept(&m_pOurType);
+        m_pParentFilter = new CBaseFilter2();
+        m_pSrcFilter = new CBaseFilter1(&m_pOurType, m_pParentFilter);
 
-        CBaseFilter2 *basef = new CBaseFilter2();
-        CBasePin *remotep = basef->GetPin(1);
-        remotep->AddRef();
-        res = m_pInputPin->ReceiveConnection(remotep, &m_pOurType); 
+        m_pOurInput = m_pSrcFilter->GetPin(1);
+        m_pOurInput->AddRef();
+
+        res = m_pInputPin->ReceiveConnection(m_pOurInput, &m_pOurType); 
+
+        res = m_pImp->GetAllocator(&m_pAll);
+        ALLOCATOR_PROPERTIES props, props1;
+
+        props.cBuffers = 1;
+	    props.cbBuffer = m_pOurType.lSampleSize;
+	    props.cbAlign = 1;
+	    props.cbPrefix = 0;
+
+        DebugBreak();
+        res = m_pAll->SetProperties(&props, &props1);
+
+        m_pOurOutput = new COutputPin(&m_pDestType, NULL, NULL);
+        res = m_pOutputPin->QueryAccept(&m_pDestType);
 
         // Create receiver
         //CBaseFilter s_filter = CBaseFilter();
@@ -248,8 +265,15 @@ private:
     BITMAPINFOHEADER *m_bih;
     IBaseFilter *m_pFilter;
 
+    CBaseFilter1 *m_pSrcFilter;
+    CBaseFilter2 *m_pParentFilter;
+
+    COutputPin* m_pOurOutput;
+
     IPin *m_pInputPin;
     IPin *m_pOutputPin;
+    IPin *m_pOurInput;
+
     IMemInputPin *m_pImp;
     IMemAllocator *m_pAll;
     AM_MEDIA_TYPE m_pOurType, m_pDestType;

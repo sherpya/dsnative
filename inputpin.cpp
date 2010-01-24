@@ -19,6 +19,21 @@
 
 #include "stdafx.h"
 
+/* ---------------------------------------------- */
+
+CRemotePin1::CRemotePin1(HRESULT *phr, CBaseFilter1 *pFilter, CCritSec *pLock) : CBasePin(NAME("CRemotePin1"), pFilter, pLock, phr, L"Input", PINDIR_INPUT)
+{
+    fprintf(stderr, "CRemotePin1::CRemotePin\n");
+}
+
+HRESULT CRemotePin1::CheckMediaType(const CMediaType *)
+{
+    fprintf(stderr, "CRemotePin1::CheckMediaType\n");
+    return E_NOTIMPL;
+}
+
+/* ---------------------------------------------- */
+
 CRemotePin2::CRemotePin2(HRESULT *phr, CBaseFilter2 *pFilter, CCritSec *pLock) : CBasePin(NAME("CRemotePin2"), pFilter, pLock, phr, L"Output", PINDIR_OUTPUT)
 {
     fprintf(stderr, "CRemotePin2::CRemotePin2\n");
@@ -29,6 +44,29 @@ HRESULT CRemotePin2::CheckMediaType(const CMediaType *)
     fprintf(stderr, "CRemotePin2::CheckMediaType\n");
     return E_NOTIMPL;
 }
+
+/* ---------------------------------------------- */
+
+CBaseFilter1::CBaseFilter1(const AM_MEDIA_TYPE* type, CBaseFilter2* parent) : CBaseFilter(NAME("CBaseFilter2"), NULL, &m_csFilter, GUID_NULL)
+{
+    fprintf(stderr, "CBaseFilter1::CBaseFilter1\n");
+    m_pin = new CRemotePin1(&m_hr, this, &m_csFilter);
+    m_unused_pin = parent->GetPin(1);
+}
+
+int CBaseFilter1::GetPinCount(void)
+{
+    fprintf(stderr, "CBaseFilter::GetPinCount\n");
+    return 1;
+}
+
+CBasePin *CBaseFilter1::GetPin(int n)
+{
+    fprintf(stderr, "CBaseFilter::GetPin\n");
+    return this->m_pin;
+}
+
+/* ---------------------------------------------- */
 
 CBaseFilter2::CBaseFilter2() : CBaseFilter(NAME("CBaseFilter2"), NULL, &m_csFilter, GUID_NULL)
 {

@@ -17,7 +17,23 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
+class CBaseFilter1;
 class CBaseFilter2;
+class CRemotePin1;
+class CRemotePin2;
+
+class CRemotePin1: public CBasePin
+{
+public:
+    CRemotePin1::CRemotePin1(HRESULT *phr, CBaseFilter1 *pFilter, CCritSec *pLock);
+    HRESULT CheckMediaType(const CMediaType *);
+
+    HRESULT STDMETHODCALLTYPE BeginFlush(void) { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE EndFlush(void) { return E_NOTIMPL; }
+    // CRemotePin_QueryPinInfo
+    // CRemotePin_ConnectedTo
+    // CRemotePin_Destroy
+};
 
 class CRemotePin2: public CBasePin
 {
@@ -29,6 +45,19 @@ public:
     HRESULT STDMETHODCALLTYPE EndFlush(void) { return E_NOTIMPL; }
     // CRemotePin2_QueryPinInfo
     // CRemotePin2_Destroy
+};
+
+class CBaseFilter1 : public CBaseFilter
+{
+public:
+    CBaseFilter1::CBaseFilter1(const AM_MEDIA_TYPE* type, CBaseFilter2* parent);
+    int GetPinCount(void);
+    CBasePin *GetPin(int n);
+private:
+    CRemotePin1 *m_pin;
+    IPin *m_unused_pin;
+    HRESULT m_hr;
+    CCritSec m_csFilter;
 };
 
 class CBaseFilter2 : public CBaseFilter
@@ -43,3 +72,4 @@ private:
     HRESULT m_hr;
     CCritSec m_csFilter;
 };
+

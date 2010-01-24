@@ -187,6 +187,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\outputpin.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\stdafx.cpp"
 				>
 				<FileConfiguration
@@ -214,6 +218,10 @@
 			>
 			<File
 				RelativePath=".\inputpin.h"
+				>
+			</File>
+			<File
+				RelativePath=".\outputpin.h"
 				>
 			</File>
 			<File
