@@ -25,14 +25,20 @@ class CRemotePin2;
 class CRemotePin1: public CBasePin
 {
 public:
-    CRemotePin1::CRemotePin1(HRESULT *phr, CBaseFilter1 *pFilter, CCritSec *pLock);
+    CRemotePin1::CRemotePin1(HRESULT *phr, CBaseFilter1 *pFilter, IPin *remote, CCritSec *pLock);
     HRESULT CheckMediaType(const CMediaType *);
 
     HRESULT STDMETHODCALLTYPE BeginFlush(void) { return E_NOTIMPL; }
     HRESULT STDMETHODCALLTYPE EndFlush(void) { return E_NOTIMPL; }
-    // CRemotePin_QueryPinInfo
-    // CRemotePin_ConnectedTo
+
+    HRESULT STDMETHODCALLTYPE ConnectedTo(IPin **pPin);
+    HRESULT STDMETHODCALLTYPE QueryPinInfo(PIN_INFO *pInfo);
+
+    //HRESULT STDMETHODCALLTYPE Connect(IPin *pReceivePin, const AM_MEDIA_TYPE *pmt);
     // CRemotePin_Destroy
+private:
+    IPin *remote_pin;
+    IBaseFilter *parent;
 };
 
 class CRemotePin2: public CBasePin

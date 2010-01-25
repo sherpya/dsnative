@@ -129,13 +129,38 @@ public:
         HRESULT res;
 
         m_pDestType.majortype = MEDIATYPE_Video;
-        m_pDestType.subtype = MEDIASUBTYPE_RGB24;
-        m_pDestType.formattype = FORMAT_VideoInfo;
+        m_pDestType.subtype = MEDIASUBTYPE_YV12;
+        m_pDestType.formattype = FORMAT_VideoInfo2;
         m_pDestType.bFixedSizeSamples = TRUE;
         m_pDestType.bTemporalCompression = FALSE;
-        m_pDestType.lSampleSize = labs(m_bih->biWidth * m_bih->biHeight * ((m_bih->biBitCount + 7) / 8));
+        m_pDestType.lSampleSize = 1;
         m_pDestType.pUnk = 0;
 
+        memset(&m_vi2, 0, sizeof(m_vi2));
+        memcpy(&m_vi2.bmiHeader, m_bih, sizeof(m_vi2.bmiHeader));
+        m_vi2.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        m_vi2.bmiHeader.biCompression = 0x32315659;
+        m_vi2.bmiHeader.biBitCount = 12;
+        m_vi2.bmiHeader.biPlanes = 3;
+        m_vi2.bmiHeader.biSizeImage = labs(m_bih->biWidth * m_bih->biHeight * ((m_bih->biBitCount + 7) / 8)) / 2;
+
+        m_pDestType.cbFormat = sizeof(VIDEOINFOHEADER2);
+        m_pDestType.pbFormat = (BYTE *) &m_vi2;
+
+        res = m_pOutputPin->QueryAccept(&m_pDestType);
+
+        printf("Decoder supports the following YUV formats:\n");
+        ct* c;
+        for (c = check; c->bits; c++)
+        {
+            m_viOut.bmiHeader.biBitCount = c->bits;
+            m_viOut.bmiHeader.biCompression = c->fcc;
+            m_pDestType.subtype = *c->subtype;
+            res = m_pOutputPin->QueryAccept(&m_pDestType);
+            printf("%.4s : %s\n", (char *) &c->fcc, (res == S_OK) ? "yes" : "no");
+        }
+
+#if 0
         memset(&m_viOut, 0, sizeof(m_viOut));
 
         m_viOut.rcSource.left = m_viOut.rcSource.top = 0;
@@ -152,7 +177,7 @@ public:
         m_pDestType.cbFormat = sizeof(VIDEOINFOHEADER);
         m_pDestType.pbFormat = (BYTE *) &m_viOut;
 
-        m_viOut.bmiHeader.biHeight *= -1;
+        //m_viOut.bmiHeader.biHeight *= -1;
 
         res = m_pOutputPin->QueryAccept(&m_pDestType);
         printf("Decoder supports the following YUV formats:\n");
@@ -165,7 +190,7 @@ public:
             res = m_pOutputPin->QueryAccept(&m_pDestType);
             printf("%.4s : %s\n", (char *) &c->fcc, (res == S_OK) ? "yes" : "no");
         }
-
+#endif
         return TRUE;
     }
 
@@ -266,7 +291,7 @@ public:
         HRESULT res;
         this->EnumPins();
         this->SetInputType();
-        //this->SetOutputType();
+        this->SetOutputType();
 
         res = m_pInputPin->QueryAccept(&m_pOurType);
         m_pParentFilter = new CBaseFilter2();
@@ -275,6 +300,7 @@ public:
         m_pOurInput = m_pSrcFilter->GetPin(1);
         m_pOurInput->AddRef();
 
+        DebugBreak();
         res = m_pInputPin->ReceiveConnection(m_pOurInput, &m_pOurType); 
 
         res = m_pImp->GetAllocator(&m_pAll);
@@ -359,7 +385,7 @@ private:
     AM_MEDIA_TYPE m_pOurType, m_pDestType;
     MPEG2VIDEOINFO m_mp2vi;
     VIDEOINFOHEADER m_vi, m_viOut;
-    //VIDEOINFOHEADER2 m_vi2;
+    VIDEOINFOHEADER2 m_vi2;
 };
 
 
@@ -367,7 +393,10 @@ extern "C" DSCodec * WINAPI DSOpenCodec(const char *dll, const GUID guid, BITMAP
 {
     DSCodec *codec = new DSCodec(dll, guid, bih);
     if (!codec->LoadLibrary())
+    {
+        fprintf(stderr, "LoadLibrary Failed %d\n", GetLastError());
         return NULL;
+    }
     if (!codec->CreateFilter())
         return NULL;
     if (!codec->CreateGraph())

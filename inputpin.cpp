@@ -21,7 +21,8 @@
 
 /* ---------------------------------------------- */
 
-CRemotePin1::CRemotePin1(HRESULT *phr, CBaseFilter1 *pFilter, CCritSec *pLock) : CBasePin(NAME("CRemotePin1"), pFilter, pLock, phr, L"Input", PINDIR_INPUT)
+CRemotePin1::CRemotePin1(HRESULT *phr, CBaseFilter1 *pFilter, IPin *remote, CCritSec *pLock) :
+    remote_pin(remote), parent(pFilter), CBasePin(NAME("CRemotePin1"), pFilter, pLock, phr, L"Output", PINDIR_OUTPUT)
 {
     fprintf(stderr, "CRemotePin1::CRemotePin\n");
 }
@@ -30,6 +31,27 @@ HRESULT CRemotePin1::CheckMediaType(const CMediaType *)
 {
     fprintf(stderr, "CRemotePin1::CheckMediaType\n");
     return E_NOTIMPL;
+}
+
+//HRESULT CRemotePin1::Connect(IPin *pReceivePin, const AM_MEDIA_TYPE *pmt)
+//{
+//    return E_NOTIMPL;
+//}
+
+HRESULT CRemotePin1::ConnectedTo(IPin **pPin)
+{
+    if (!pPin) return E_POINTER;
+    *pPin = remote_pin;
+    remote_pin->AddRef();
+    return S_OK;
+}
+
+HRESULT CRemotePin1::QueryPinInfo(PIN_INFO *pInfo)
+{
+    pInfo->dir = PINDIR_OUTPUT;
+    pInfo->pFilter = parent;
+    pInfo->achName[0] = 0;
+    return S_OK;
 }
 
 /* ---------------------------------------------- */
@@ -50,8 +72,7 @@ HRESULT CRemotePin2::CheckMediaType(const CMediaType *)
 CBaseFilter1::CBaseFilter1(const AM_MEDIA_TYPE* type, CBaseFilter2* parent) : CBaseFilter(NAME("CBaseFilter2"), NULL, &m_csFilter, GUID_NULL)
 {
     fprintf(stderr, "CBaseFilter1::CBaseFilter1\n");
-    m_pin = new CRemotePin1(&m_hr, this, &m_csFilter);
-    m_unused_pin = parent->GetPin(1);
+    m_pin = new CRemotePin1(&m_hr, this,  parent->GetPin(1), &m_csFilter);
 }
 
 int CBaseFilter1::GetPinCount(void)
