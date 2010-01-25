@@ -19,6 +19,49 @@
 
 #include "stdafx.h"
 
+#define fccYUV  mmioFOURCC('Y', 'U', 'V', ' ')
+#define fccYUY2 mmioFOURCC('Y', 'U', 'Y', '2')
+#define fccYV12 mmioFOURCC('Y', 'V', '1', '2')/* Planar mode: Y + V + U  (3 planes) */
+#define fccI420 mmioFOURCC('I', '4', '2', '0')
+#define fccIYUV mmioFOURCC('I', 'Y', 'U', 'V')/* Planar mode: Y + U + V  (3 planes) */
+#define fccUYVY mmioFOURCC('U', 'Y', 'V', 'Y')/* Packed mode: U0+Y0+V0+Y1 (1 plane) */
+#define fccYVYU mmioFOURCC('Y', 'V', 'Y', 'U')/* Packed mode: Y0+V0+Y1+U0 (1 plane) */
+#define fccYVU9 mmioFOURCC('Y', 'V', 'U', '9')/* Planar 4:1:0 */
+#define fccIF09 mmioFOURCC('I', 'F', '0', '9')/* Planar 4:1:0 + delta */
+
+enum CAPS
+{
+    CAP_NONE = 0,
+    CAP_YUY2 = 1,
+    CAP_YV12 = 2,
+    CAP_IYUV = 4,
+    CAP_UYVY = 8,
+    CAP_YVYU = 16,
+    CAP_I420 = 32,
+    CAP_YVU9 = 64,
+    CAP_IF09 = 128,
+};
+
+typedef struct _ct
+{
+    unsigned int bits;
+    unsigned int fcc;
+    const GUID *subtype;
+    int cap;
+} ct;
+            
+static ct check[] = {
+        {16, fccYUY2, &MEDIASUBTYPE_YUY2, CAP_YUY2},
+        {12, fccIYUV, &MEDIASUBTYPE_IYUV, CAP_IYUV},
+        {16, fccUYVY, &MEDIASUBTYPE_UYVY, CAP_UYVY},
+        {12, fccYV12, &MEDIASUBTYPE_YV12, CAP_YV12},
+        {16, fccYV12, &MEDIASUBTYPE_YV12, CAP_YV12},
+        {16, fccYVYU, &MEDIASUBTYPE_YVYU, CAP_YVYU},
+//        {12, fccI420, &MEDIASUBTYPE_I420, CAP_I420},
+        {9,  fccYVU9, &MEDIASUBTYPE_YVU9, CAP_YVU9},
+        {0, 0, 0, 0},
+        };
+
 class DSCodec
 {
 public:
@@ -63,25 +106,65 @@ public:
         return m_pFilter->Release();
     }
 
+    BOOL CheckMediaTypes(IPin *pin)
+    {
+        IEnumMediaTypes *pMedia;
+        AM_MEDIA_TYPE *pmt = NULL, *pfnt = NULL;
+        HRESULT res = pin->EnumMediaTypes(&pMedia);
+        pMedia->Reset();
+        while((res = pMedia->Next(1, &pmt, NULL)) == S_OK)
+        {
+            if (pmt->formattype == FORMAT_VideoInfo)
+            {
+                VIDEOINFOHEADER *vih = (VIDEOINFOHEADER *) pmt->pbFormat;
+                DeleteMediaType(pmt);
+            }
+        }
+        pMedia->Release();
+        return TRUE;
+    }
+
     BOOL SetOutputType(void)
     {
+        HRESULT res;
+
         m_pDestType.majortype = MEDIATYPE_Video;
         m_pDestType.subtype = MEDIASUBTYPE_RGB24;
-        m_pDestType.formattype = FORMAT_VideoInfo2;
+        m_pDestType.formattype = FORMAT_VideoInfo;
         m_pDestType.bFixedSizeSamples = TRUE;
         m_pDestType.bTemporalCompression = FALSE;
-        m_pDestType.lSampleSize = 1;
+        m_pDestType.lSampleSize = labs(m_bih->biWidth * m_bih->biHeight * ((m_bih->biBitCount + 7) / 8));
         m_pDestType.pUnk = 0;
 
-        memset(&m_vi2, 0, sizeof(m_vi2));
-        m_vi2.bmiHeader.biSizeImage = m_pDestType.lSampleSize;
-        m_vi2.bmiHeader.biBitCount = 24;
-        m_vi2.bmiHeader.biBitCount = 0;
-        m_vi2.bmiHeader.biWidth = m_bih->biWidth;
-        m_vi2.bmiHeader.biHeight = m_bih->biHeight;
+        memset(&m_viOut, 0, sizeof(m_viOut));
 
-        m_pDestType.cbFormat = sizeof(VIDEOINFOHEADER2);
-        m_pDestType.pbFormat = (BYTE *) &m_vi2;
+        m_viOut.rcSource.left = m_viOut.rcSource.top = 0;
+        m_viOut.rcSource.right = m_bih->biWidth;
+        m_viOut.rcSource.bottom = m_bih->biHeight;
+        m_viOut.rcTarget = m_viOut.rcSource;
+
+        memcpy(&m_viOut.bmiHeader, m_bih, sizeof(BITMAPINFOHEADER));
+        m_viOut.bmiHeader.biSizeImage = m_pDestType.lSampleSize;
+
+        m_viOut.bmiHeader.biCompression = 0;
+        m_viOut.bmiHeader.biBitCount = 24;
+
+        m_pDestType.cbFormat = sizeof(VIDEOINFOHEADER);
+        m_pDestType.pbFormat = (BYTE *) &m_viOut;
+
+        m_viOut.bmiHeader.biHeight *= -1;
+
+        res = m_pOutputPin->QueryAccept(&m_pDestType);
+        printf("Decoder supports the following YUV formats:\n");
+        ct* c;
+        for (c = check; c->bits; c++)
+        {
+            m_viOut.bmiHeader.biBitCount = c->bits;
+            m_viOut.bmiHeader.biCompression = c->fcc;
+            m_pDestType.subtype = *c->subtype;
+            res = m_pOutputPin->QueryAccept(&m_pDestType);
+            printf("%.4s : %s\n", (char *) &c->fcc, (res == S_OK) ? "yes" : "no");
+        }
 
         return TRUE;
     }
@@ -183,7 +266,7 @@ public:
         HRESULT res;
         this->EnumPins();
         this->SetInputType();
-        this->SetOutputType();
+        //this->SetOutputType();
 
         res = m_pInputPin->QueryAccept(&m_pOurType);
         m_pParentFilter = new CBaseFilter2();
@@ -202,15 +285,12 @@ public:
 	    props.cbAlign = 1;
 	    props.cbPrefix = 0;
 
-        DebugBreak();
         res = m_pAll->SetProperties(&props, &props1);
 
-        m_pOurOutput = new COutputPin(&m_pDestType, NULL, NULL);
-        res = m_pOutputPin->QueryAccept(&m_pDestType);
+        m_pOurOutput = new COutputPin(&m_pDestType, NULL, NULL, m_pParentFilter);
 
-        // Create receiver
-        //CBaseFilter s_filter = CBaseFilter();
-        res = m_pOutputPin->QueryAccept(&m_pDestType);
+        SetOutputType();
+        res = m_pOutputPin->ReceiveConnection(m_pOurOutput, &m_pDestType);
         res = m_pImp->NotifyAllocator(m_pAll, FALSE);
 
         return TRUE;
@@ -278,8 +358,8 @@ private:
     IMemAllocator *m_pAll;
     AM_MEDIA_TYPE m_pOurType, m_pDestType;
     MPEG2VIDEOINFO m_mp2vi;
-    VIDEOINFOHEADER m_vi;
-    VIDEOINFOHEADER2 m_vi2;
+    VIDEOINFOHEADER m_vi, m_viOut;
+    //VIDEOINFOHEADER2 m_vi2;
 };
 
 

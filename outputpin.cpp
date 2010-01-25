@@ -41,8 +41,8 @@ HRESULT COutputMemPin::ReceiveMultiple(IMediaSample **pSamples, long nSamples, l
     return hr;
 }
 
-COutputPin::COutputPin(const AM_MEDIA_TYPE *amt, SAMPLEPROC SampleProc, void *pUserData) :
-    SampleProc(SampleProc), pUserData(pUserData), CUnknown(NAME("COutputPin"), NULL)
+COutputPin::COutputPin(const AM_MEDIA_TYPE *amt, SAMPLEPROC SampleProc, void *pUserData, CBaseFilter2 *pFilter):
+SampleProc(SampleProc), pUserData(pUserData), CBasePin(NAME("COutputPin"), pFilter, m_pLock, &m_hr, L"Input", PINDIR_OUTPUT)
 {
     CopyMediaType(&type, amt);
     mempin = new COutputMemPin(this);
