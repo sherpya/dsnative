@@ -183,11 +183,11 @@
 				>
 			</File>
 			<File
-				RelativePath=".\inputpin.cpp"
+				RelativePath=".\renderpin.cpp"
 				>
 			</File>
 			<File
-				RelativePath=".\outputpin.cpp"
+				RelativePath=".\senderpin.cpp"
 				>
 			</File>
 			<File
@@ -217,11 +217,11 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
-				RelativePath=".\inputpin.h"
+				RelativePath=".\renderpin.h"
 				>
 			</File>
 			<File
-				RelativePath=".\outputpin.h"
+				RelativePath=".\senderpin.h"
 				>
 			</File>
 			<File

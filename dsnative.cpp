@@ -68,7 +68,7 @@ public:
     DSCodec::DSCodec(const char *filename, const GUID guid, BITMAPINFOHEADER *bih) :
       m_guid(guid), m_bih(bih), m_hDll(NULL), m_pFilter(NULL),
       m_pInputPin(NULL), m_pOutputPin(NULL), m_pOurInput(NULL), m_pOurOutput(NULL),
-      m_pImp(NULL), m_pSrcFilter(NULL), m_pParentFilter(NULL)
+      m_pImp(NULL), m_pSFilter(NULL), m_pRFilter(NULL)
     {
         strncpy(m_fname, filename, MAX_PATH);
     }
@@ -148,7 +148,7 @@ public:
         m_pDestType.pbFormat = (BYTE *) &m_vi2;
 
         res = m_pOutputPin->QueryAccept(&m_pDestType);
-
+#if 0
         printf("Decoder supports the following YUV formats:\n");
         ct* c;
         for (c = check; c->bits; c++)
@@ -159,7 +159,7 @@ public:
             res = m_pOutputPin->QueryAccept(&m_pDestType);
             printf("%.4s : %s\n", (char *) &c->fcc, (res == S_OK) ? "yes" : "no");
         }
-
+#endif
 #if 0
         memset(&m_viOut, 0, sizeof(m_viOut));
 
@@ -291,18 +291,13 @@ public:
         HRESULT res;
         this->EnumPins();
         this->SetInputType();
-        this->SetOutputType();
 
         res = m_pInputPin->QueryAccept(&m_pOurType);
-        m_pParentFilter = new CBaseFilter2();
-        m_pSrcFilter = new CBaseFilter1(&m_pOurType, m_pParentFilter);
 
-        m_pOurInput = m_pSrcFilter->GetPin(1);
-        m_pOurInput->AddRef();
+        m_pSFilter = new CSenderFilter();
+        m_pOurInput = (CSenderPin *) m_pSFilter->GetPin();
 
-        DebugBreak();
         res = m_pInputPin->ReceiveConnection(m_pOurInput, &m_pOurType); 
-
         res = m_pImp->GetAllocator(&m_pAll);
         ALLOCATOR_PROPERTIES props, props1;
 
@@ -312,13 +307,18 @@ public:
 	    props.cbPrefix = 0;
 
         res = m_pAll->SetProperties(&props, &props1);
-
-        m_pOurOutput = new COutputPin(&m_pDestType, NULL, NULL, m_pParentFilter);
-
-        SetOutputType();
-        res = m_pOutputPin->ReceiveConnection(m_pOurOutput, &m_pDestType);
         res = m_pImp->NotifyAllocator(m_pAll, FALSE);
 
+        m_pRFilter = new CRenderFilter();
+        m_pOurOutput = (CRenderPin *) m_pRFilter->GetPin();
+
+        SetOutputType();
+        res = m_pOurOutput->QueryAccept(&m_pDestType);
+
+        DebugBreak();
+
+        res = m_pOutputPin->ReceiveConnection(m_pOurOutput, &m_pDestType);
+        
         return TRUE;
     }
 
@@ -371,14 +371,13 @@ private:
     BITMAPINFOHEADER *m_bih;
     IBaseFilter *m_pFilter;
 
-    CBaseFilter1 *m_pSrcFilter;
-    CBaseFilter2 *m_pParentFilter;
-
-    COutputPin* m_pOurOutput;
+    CSenderFilter *m_pSFilter;
+    CRenderFilter *m_pRFilter;
+    CRenderPin *m_pOurOutput;
+    CSenderPin *m_pOurInput;
 
     IPin *m_pInputPin;
     IPin *m_pOutputPin;
-    IPin *m_pOurInput;
 
     IMemInputPin *m_pImp;
     IMemAllocator *m_pAll;

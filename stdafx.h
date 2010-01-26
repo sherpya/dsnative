@@ -45,7 +45,10 @@
 
 #include <commctrl.h>
 
-#include "inputpin.h"
-#include "outputpin.h"
+#include "senderpin.h"
+#include "renderpin.h"
+
+//#include "inputpin.h"
+//#include "outputpin.h"
 
 // TODO: reference additional headers your program requires here

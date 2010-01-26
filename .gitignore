@@ -1,6 +1,7 @@
 *.pdb
 *.ncb
 *.suo
+*.lib
 *.vcproj.*.user
 Debug
 Release
