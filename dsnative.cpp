@@ -62,10 +62,10 @@ static ct check[] = {
         {0, 0, 0, 0},
         };
 
-class DSCodec
+class DSVideoCodec
 {
 public:
-    DSCodec::DSCodec(const char *filename, const GUID guid, BITMAPINFOHEADER *bih) :
+    DSVideoCodec::DSVideoCodec(const char *filename, const GUID guid, BITMAPINFOHEADER *bih) :
       m_guid(guid), m_bih(bih), m_hDll(NULL), m_pFilter(NULL),
       m_pInputPin(NULL), m_pOutputPin(NULL), m_pOurInput(NULL), m_pOurOutput(NULL),
       m_pImp(NULL), m_pSFilter(NULL), m_pRFilter(NULL)
@@ -388,28 +388,28 @@ private:
 };
 
 
-extern "C" DSCodec * WINAPI DSOpenCodec(const char *dll, const GUID guid, BITMAPINFOHEADER* bih)
+extern "C" DSVideoCodec * WINAPI DSOpenVideoCodec(const char *dll, const GUID guid, BITMAPINFOHEADER* bih)
 {
-    DSCodec *codec = new DSCodec(dll, guid, bih);
-    if (!codec->LoadLibrary())
+    DSVideoCodec *vcodec = new DSVideoCodec(dll, guid, bih);
+    if (!vcodec->LoadLibrary())
     {
         fprintf(stderr, "LoadLibrary Failed %d\n", GetLastError());
         return NULL;
     }
-    if (!codec->CreateFilter())
+    if (!vcodec->CreateFilter())
         return NULL;
-    if (!codec->CreateGraph())
+    if (!vcodec->CreateGraph())
         return NULL;
-    return codec;
+    return vcodec;
 }
 
-extern "C" void WINAPI DSCloseCodec(DSCodec *codec)
+extern "C" void WINAPI DSCloseVideoCodec(DSVideoCodec *vcodec)
 {
-    codec->ReleaseFilter();
-    delete codec;
+    vcodec->ReleaseFilter();
+    delete vcodec;
 }
 
-extern "C" BOOL WINAPI DSShowPropertyPage(DSCodec *codec)
+extern "C" BOOL WINAPI DSShowPropertyPage(DSVideoCodec *codec)
 {
     return codec->ShowPropertyPage();
 }

@@ -1,5 +1,5 @@
 EXPORTS
 
-DSOpenCodec
-DSCloseCodec
+DSOpenVideoCodec
+DSCloseVideoCodec
 DSShowPropertyPage
