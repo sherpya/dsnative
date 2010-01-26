@@ -42,22 +42,20 @@ public:
         LPFNGETCLASSOBJECT pDllGetClassObject = (LPFNGETCLASSOBJECT) GetProcAddress(m_hDll, "DllGetClassObject");
         if (!pDllGetClassObject) return FALSE;
 
-        HRESULT res;
-
         IClassFactory *factory;
-        res = pDllGetClassObject(m_guid, IID_IClassFactory, (LPVOID *) &factory);
-        if (FAILED(res))return FALSE;
+        m_res = pDllGetClassObject(m_guid, IID_IClassFactory, (LPVOID *) &factory);
+        if (FAILED(m_res))return FALSE;
 
         IUnknown* object;
-        res = factory->CreateInstance(NULL, IID_IUnknown, (LPVOID *) &object);
+        m_res = factory->CreateInstance(NULL, IID_IUnknown, (LPVOID *) &object);
         factory->Release();
 
-        if (FAILED(res)) return FALSE;
+        if (FAILED(m_res)) return FALSE;
 
-        res = object->QueryInterface(IID_IBaseFilter, (LPVOID *) &m_pFilter);
+        m_res = object->QueryInterface(IID_IBaseFilter, (LPVOID *) &m_pFilter);
         object->Release();
 
-        return (!FAILED(res));
+        return (!FAILED(m_res));
     }
 
     BOOL ReleaseFilter(void)
@@ -69,9 +67,9 @@ public:
     {
         IEnumMediaTypes *pMedia;
         AM_MEDIA_TYPE *pmt = NULL, *pfnt = NULL;
-        HRESULT res = pin->EnumMediaTypes(&pMedia);
+        HRESULT m_res = pin->EnumMediaTypes(&pMedia);
         pMedia->Reset();
-        while((res = pMedia->Next(1, &pmt, NULL)) == S_OK)
+        while((m_res = pMedia->Next(1, &pmt, NULL)) == S_OK)
         {
             if (pmt->formattype == FORMAT_VideoInfo)
             {
@@ -85,8 +83,6 @@ public:
 
     BOOL SetOutputType(void)
     {
-        HRESULT res;
-
         // FIXME: divx needs FORMAT_VideoInfo, avc needs FORMAT_VideoInfo2
         m_pDestType.majortype = MEDIATYPE_Video;
         m_pDestType.formattype = FORMAT_VideoInfo2;
@@ -136,7 +132,7 @@ public:
 
         //m_viOut.bmiHeader.biHeight *= -1;
 
-        res = m_pOutputPin->QueryAccept(&m_pDestType);
+        m_res = m_pOutputPin->QueryAccept(&m_pDestType);
         printf("Decoder supports the following YUV formats:\n");
         ct* c;
         for (c = check; c->bits; c++)
@@ -144,8 +140,8 @@ public:
             m_viOut.bmiHeader.biBitCount = c->bits;
             m_viOut.bmiHeader.biCompression = c->fcc;
             m_pDestType.subtype = *c->subtype;
-            res = m_pOutputPin->QueryAccept(&m_pDestType);
-            printf("%.4s : %s\n", (char *) &c->fcc, (res == S_OK) ? "yes" : "no");
+            m_res = m_pOutputPin->QueryAccept(&m_pDestType);
+            printf("%.4s : %s\n", (char *) &c->fcc, (m_res == S_OK) ? "yes" : "no");
         }
 #endif
         return TRUE;
@@ -213,15 +209,14 @@ public:
 
     BOOL EnumPins(void)
     {
-        HRESULT res;
         IEnumPins *enumpins;
-        res = m_pFilter->EnumPins(&enumpins);
+        m_res = m_pFilter->EnumPins(&enumpins);
         enumpins->Reset();
 
         IPin *pin;
         PIN_INFO pInfo;
 
-        while ((res = enumpins->Next(1, &pin, NULL)) == S_OK)
+        while ((m_res = enumpins->Next(1, &pin, NULL)) == S_OK)
         {
             pin->QueryPinInfo(&pInfo);
             wprintf(L"Pin: %s - %s\n", pInfo.achName, (pInfo.dir == PINDIR_INPUT) ? L"Input" : L"Output");
@@ -239,32 +234,31 @@ public:
         }
 
         enumpins->Release();
-        res = m_pInputPin->QueryInterface(IID_IMemInputPin, (LPVOID *) &m_pImp);
+        m_res = m_pInputPin->QueryInterface(IID_IMemInputPin, (LPVOID *) &m_pImp);
         return TRUE;
     }
 
     BOOL CreateGraph(void)
     {
-        HRESULT res;
         this->EnumPins();
         this->SetInputType();
 
-        res = m_pInputPin->QueryAccept(&m_pOurType);
+        m_res = m_pInputPin->QueryAccept(&m_pOurType);
 
         m_pSFilter = new CSenderFilter();
         m_pOurInput = (CSenderPin *) m_pSFilter->GetPin(0);
         m_pRFilter = new CRenderFilter();
         m_pOurOutput = (CRenderPin *) m_pRFilter->GetPin(0);
 
-        //res = m_pInputPin->ReceiveConnection(m_pOurInput, &m_pOurType); 
+        //m_res = m_pInputPin->ReceiveConnection(m_pOurInput, &m_pOurType); 
         SetOutputType();
 
-        //res = m_pOurOutput->QueryAccept(&m_pDestType);
-        //res = m_pOutputPin->ReceiveConnection(m_pOurOutput, &m_pDestType);
+        //m_res = m_pOurOutput->QueryAccept(&m_pDestType);
+        //m_res = m_pOutputPin->ReceiveConnection(m_pOurOutput, &m_pDestType);
         //m_pInputPin->Disconnect();
         //m_pOurInput->Disconnect();
 
-        res = m_pImp->GetAllocator(&m_pAll);
+        m_res = m_pImp->GetAllocator(&m_pAll);
         ALLOCATOR_PROPERTIES props, props1;
 
         props.cBuffers = 1;
@@ -272,8 +266,8 @@ public:
 	    props.cbAlign = 1;
 	    props.cbPrefix = 0;
 
-        res = m_pAll->SetProperties(&props, &props1);
-        res = m_pImp->NotifyAllocator(m_pAll, FALSE);
+        m_res = m_pAll->SetProperties(&props, &props1);
+        m_res = m_pImp->NotifyAllocator(m_pAll, FALSE);
 
         return TRUE;
     }
@@ -314,33 +308,32 @@ public:
 
     BOOL StartGraph(void)
     {
-        HRESULT res;
-        res = m_pAll->Commit();
+        m_res = m_pAll->Commit();
 
         IGraphBuilder *pGraph = NULL;
         DWORD dwRegister;
 
-        res = CoCreateInstance(CLSID_FilterGraph, NULL, CLSCTX_INPROC_SERVER, IID_IGraphBuilder, (void **) &pGraph);
-        res = AddToRot(pGraph, &dwRegister);
+        m_res = CoCreateInstance(CLSID_FilterGraph, NULL, CLSCTX_INPROC_SERVER, IID_IGraphBuilder, (void **) &pGraph);
+        m_res = AddToRot(pGraph, &dwRegister);
 
         //HANDLE hFile = CreateFile("out.log", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
         //DWORD r;
         //const char bom[] = "\xff\xfe";
         //WriteFile(hFile, bom, 2, &r, NULL);
-        //res = pGraph->SetLogFile((DWORD_PTR) hFile);
+        //m_res = pGraph->SetLogFile((DWORD_PTR) hFile);
 
-        res = pGraph->SetLogFile((DWORD_PTR) GetStdHandle(STD_OUTPUT_HANDLE));
+        m_res = pGraph->SetLogFile((DWORD_PTR) GetStdHandle(STD_OUTPUT_HANDLE));
         
-        res = pGraph->AddFilter(m_pSFilter, L"DS Sender");
-        res = pGraph->AddFilter(m_pRFilter, L"DS Render");
-        res = pGraph->AddFilter(m_pFilter, L"Binary Codec");
+        m_res = pGraph->AddFilter(m_pSFilter, L"DS Sender");
+        m_res = pGraph->AddFilter(m_pRFilter, L"DS Render");
+        m_res = pGraph->AddFilter(m_pFilter, L"Binary Codec");
         
-        res = pGraph->ConnectDirect(m_pOurInput, m_pInputPin, &m_pOurType);
+        m_res = pGraph->ConnectDirect(m_pOurInput, m_pInputPin, &m_pOurType);
 
-        res = m_pOutputPin->QueryAccept(&m_pDestType);
+        m_res = m_pOutputPin->QueryAccept(&m_pDestType);
 
-        res = pGraph->ConnectDirect(m_pOurOutput, m_pOutputPin, &m_pDestType);
-        res = pGraph->ConnectDirect(m_pOutputPin, m_pOurOutput, &m_pDestType);
+        m_res = pGraph->ConnectDirect(m_pOurOutput, m_pOutputPin, &m_pDestType);
+        m_res = pGraph->ConnectDirect(m_pOutputPin, m_pOurOutput, &m_pDestType);
 
         IMediaControl *pMC = NULL;
         pGraph->QueryInterface(IID_IMediaControl, (void **) &pMC);    
@@ -351,22 +344,21 @@ public:
 
     BOOL Decode(const BYTE *src, int size, int is_keyframe, BYTE *pImage)
     {
-        HRESULT res;
         IMediaSample* sample = NULL;
         BYTE *ptr;
 
-        res = m_pAll->GetBuffer(&sample, 0, 0, 0);
-        res = sample->SetActualDataLength(size);
-        res = sample->GetPointer(&ptr);
+        m_res = m_pAll->GetBuffer(&sample, 0, 0, 0);
+        m_res = sample->SetActualDataLength(size);
+        m_res = sample->GetPointer(&ptr);
         memcpy(ptr, src, size);
-        res = sample->SetSyncPoint(is_keyframe);
-        res = sample->SetPreroll(pImage ? 0 : 1);
-        res = sample->SetDiscontinuity(m_discontinuity);
+        m_res = sample->SetSyncPoint(is_keyframe);
+        m_res = sample->SetPreroll(pImage ? 0 : 1);
+        m_res = sample->SetDiscontinuity(m_discontinuity);
         m_discontinuity = 0;
 
         g_ptr = pImage;
-        //res = m_pOurOutput->Receive(sample); // for debug it displays noise
-        res = m_pImp->Receive(sample);
+        //m_res = m_pOurOutput->Receive(sample); // for debug it displays noise
+        m_res = m_pImp->Receive(sample);
 
         sample->Release();
         return TRUE;
@@ -375,22 +367,21 @@ public:
     BOOL ShowPropertyPage(void)
     {
         if (!m_pFilter) return FALSE;
-        HRESULT res;
         ISpecifyPropertyPages *pProp;
-        if ((res = m_pFilter->QueryInterface(IID_ISpecifyPropertyPages, (LPVOID *) &pProp)) == S_OK)
+        if ((m_res = m_pFilter->QueryInterface(IID_ISpecifyPropertyPages, (LPVOID *) &pProp)) == S_OK)
         {
             // Get the filter's name and IUnknown pointer.
             FILTER_INFO FilterInfo;
-            res = m_pFilter->QueryFilterInfo(&FilterInfo); 
+            m_res = m_pFilter->QueryFilterInfo(&FilterInfo); 
             IUnknown *pFilterUnk;
-            res = m_pFilter->QueryInterface(IID_IUnknown, (LPVOID *) &pFilterUnk);
+            m_res = m_pFilter->QueryInterface(IID_IUnknown, (LPVOID *) &pFilterUnk);
             CAUUID caGUID;
             pProp->GetPages(&caGUID);
             pProp->Release();
 
             __try
             {
-                res = OleCreatePropertyFrame(
+                m_res = OleCreatePropertyFrame(
                     NULL,                   // Parent window
                     0, 0,                   // Reserved
                     FilterInfo.achName,     // Caption for the dialog box
@@ -411,7 +402,7 @@ public:
             //FilterInfo.pGraph->Release(); 
             CoTaskMemFree(caGUID.pElems);
         }
-        return (!FAILED(res));
+        return (!FAILED(m_res));
     }
 
     void SetOutputFormat(void)
@@ -460,6 +451,7 @@ private:
     char m_fname[MAX_PATH + 1];
     unsigned int m_outfmt;
     int m_discontinuity;
+    HRESULT m_res;
     BITMAPINFOHEADER *m_bih;
     IBaseFilter *m_pFilter;
 
