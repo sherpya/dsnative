@@ -27,7 +27,7 @@ public:
     DSVideoCodec::DSVideoCodec(const char *filename, const GUID guid, BITMAPINFOHEADER *bih, unsigned int outfmt) :
       m_guid(guid), m_bih(bih), m_hDll(NULL), m_outfmt(outfmt), m_discontinuity(1), m_pFilter(NULL),
       m_pInputPin(NULL), m_pOutputPin(NULL), m_pOurInput(NULL), m_pOurOutput(NULL),
-      m_pImp(NULL), m_pSFilter(NULL), m_pRFilter(NULL)
+      m_pImp(NULL), m_pSFilter(NULL), m_pRFilter(NULL), m_pGraph(NULL), m_pMC(NULL)
     {
         strncpy(m_fname, filename, MAX_PATH);
     }
@@ -238,6 +238,23 @@ public:
         return TRUE;
     }
 
+    BOOL SetupAllocator(void)
+    {
+        m_res = m_pImp->GetAllocator(&m_pAll);
+        ALLOCATOR_PROPERTIES props, props1;
+
+        props.cBuffers = 1;
+	    props.cbBuffer = m_pDestType.lSampleSize;
+	    props.cbAlign = 1;
+	    props.cbPrefix = 0;
+
+        m_res = m_pAll->SetProperties(&props, &props1);
+        m_res = m_pImp->NotifyAllocator(m_pAll, FALSE);
+
+        m_res = m_pAll->Commit();
+        return TRUE;
+    }
+
     BOOL CreateGraph(void)
     {
         this->EnumPins();
@@ -250,24 +267,42 @@ public:
         m_pRFilter = new CRenderFilter();
         m_pOurOutput = (CRenderPin *) m_pRFilter->GetPin(0);
 
-        //m_res = m_pInputPin->ReceiveConnection(m_pOurInput, &m_pOurType); 
+        
         SetOutputType();
+
+        m_res = CoCreateInstance(CLSID_FilterGraph, NULL, CLSCTX_INPROC_SERVER, IID_IGraphBuilder, (void **) &m_pGraph);
+        m_res = AddToRot(m_pGraph, &m_dwRegister);
+        m_pGraph->QueryInterface(IID_IMediaControl, (void **) &m_pMC);    
+
+        //HANDLE hFile = CreateFile("out.log", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        //DWORD r;
+        //const char bom[] = "\xff\xfe";
+        //WriteFile(hFile, bom, 2, &r, NULL);
+        //m_res = pGraph->SetLogFile((DWORD_PTR) hFile);
+
+        m_res = m_pGraph->SetLogFile((DWORD_PTR) GetStdHandle(STD_OUTPUT_HANDLE));
+        
+        m_res = m_pGraph->AddFilter(m_pSFilter, L"DS Sender");
+        m_res = m_pGraph->AddFilter(m_pRFilter, L"DS Render");
+        m_res = m_pGraph->AddFilter(m_pFilter, L"Binary Codec");
+        
+        // Connect our output pin to codec input pin otherwise QueryAccept on the codec output pin will fail
+        //m_res = m_pInputPin->ReceiveConnection(m_pOurInput, &m_pOurType); 
+        m_res = m_pGraph->ConnectDirect(m_pOurInput, m_pInputPin, &m_pOurType);
+
+        m_res = m_pOutputPin->QueryAccept(&m_pDestType);
+
+        m_res = m_pGraph->ConnectDirect(m_pOurOutput, m_pOutputPin, &m_pDestType);
+        m_res = m_pGraph->ConnectDirect(m_pOutputPin, m_pOurOutput, &m_pDestType);
+        
+        
+        
 
         //m_res = m_pOurOutput->QueryAccept(&m_pDestType);
         //m_res = m_pOutputPin->ReceiveConnection(m_pOurOutput, &m_pDestType);
         //m_pInputPin->Disconnect();
         //m_pOurInput->Disconnect();
 
-        m_res = m_pImp->GetAllocator(&m_pAll);
-        ALLOCATOR_PROPERTIES props, props1;
-
-        props.cBuffers = 1;
-	    props.cbBuffer = m_pDestType.lSampleSize;
-	    props.cbAlign = 1;
-	    props.cbPrefix = 0;
-
-        m_res = m_pAll->SetProperties(&props, &props1);
-        m_res = m_pImp->NotifyAllocator(m_pAll, FALSE);
 
         return TRUE;
     }
@@ -308,37 +343,8 @@ public:
 
     BOOL StartGraph(void)
     {
-        m_res = m_pAll->Commit();
-
-        IGraphBuilder *pGraph = NULL;
-        DWORD dwRegister;
-
-        m_res = CoCreateInstance(CLSID_FilterGraph, NULL, CLSCTX_INPROC_SERVER, IID_IGraphBuilder, (void **) &pGraph);
-        m_res = AddToRot(pGraph, &dwRegister);
-
-        //HANDLE hFile = CreateFile("out.log", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-        //DWORD r;
-        //const char bom[] = "\xff\xfe";
-        //WriteFile(hFile, bom, 2, &r, NULL);
-        //m_res = pGraph->SetLogFile((DWORD_PTR) hFile);
-
-        m_res = pGraph->SetLogFile((DWORD_PTR) GetStdHandle(STD_OUTPUT_HANDLE));
-        
-        m_res = pGraph->AddFilter(m_pSFilter, L"DS Sender");
-        m_res = pGraph->AddFilter(m_pRFilter, L"DS Render");
-        m_res = pGraph->AddFilter(m_pFilter, L"Binary Codec");
-        
-        m_res = pGraph->ConnectDirect(m_pOurInput, m_pInputPin, &m_pOurType);
-
-        m_res = m_pOutputPin->QueryAccept(&m_pDestType);
-
-        m_res = pGraph->ConnectDirect(m_pOurOutput, m_pOutputPin, &m_pDestType);
-        m_res = pGraph->ConnectDirect(m_pOutputPin, m_pOurOutput, &m_pDestType);
-
-        IMediaControl *pMC = NULL;
-        pGraph->QueryInterface(IID_IMediaControl, (void **) &pMC);    
-        pMC->Run();
-
+        SetupAllocator();
+        m_pMC->Run();
         return TRUE;
     }
 
@@ -454,6 +460,10 @@ private:
     HRESULT m_res;
     BITMAPINFOHEADER *m_bih;
     IBaseFilter *m_pFilter;
+
+    IGraphBuilder *m_pGraph;
+    DWORD m_dwRegister;
+    IMediaControl *m_pMC;
 
     CSenderFilter *m_pSFilter;
     CRenderFilter *m_pRFilter;
