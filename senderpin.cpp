@@ -19,14 +19,19 @@
 
 #include "stdafx.h"
 
-CSenderPin::CSenderPin(HRESULT *phr, CSenderFilter *pFilter, CCritSec *pLock) : CBaseOutputPin(NAME("CSenderPin"), pFilter, pLock, phr, L"Output")
+CSenderPin::CSenderPin(HRESULT *phr, CSenderFilter *pFilter, CCritSec *pLock) : CBaseOutputPin(NAME("CSenderPin"), pFilter, pLock, phr, L"Sender")
 {
     fprintf(stderr, "CSenderPin::CSenderPin\n");
 }
 
 HRESULT CSenderPin::DecideBufferSize(IMemAllocator *pAlloc, ALLOCATOR_PROPERTIES *ppropInputRequest)
 {
-    return E_NOTIMPL;
+    //pAlloc->GetProperties(ppropInputRequest);
+    //ppropInputRequest->cBuffers = 1;
+    //ppropInputRequest->cbBuffer = m_mt.GetSampleSize();
+    //ppropInputRequest->cbAlign = 1;
+    //ppropInputRequest->cbPrefix = 0;
+    return S_OK;
 }
 
 HRESULT CSenderPin::CheckMediaType(const CMediaType *)
@@ -38,17 +43,5 @@ HRESULT CSenderPin::CheckMediaType(const CMediaType *)
 CSenderFilter::CSenderFilter() : CBaseFilter(NAME("CSenderFilter"), NULL, &m_csFilter, GUID_NULL)
 {
     fprintf(stderr, "CSenderFilter::CSenderFilter\n");
-    m_senderpin = new CSenderPin(&m_hr, this, &m_csFilter);
-    m_renderpin = new CRenderPin(&m_hr, this, &m_csFilter);
-}
-
-CBasePin *CSenderFilter::GetPin(int n)
-{
-    fprintf(stderr, "CSenderFilter::GetPin -> %d\n", n);
-    switch (n)
-    {
-        case 0: return m_senderpin;
-        case 1: return m_renderpin;
-    }
-    return NULL;
+    m_pin = new CSenderPin(&m_hr, this, &m_csFilter);
 }

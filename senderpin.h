@@ -19,7 +19,6 @@
 
 class CSenderFilter;
 class CSenderPin;
-class CRenderPin;
 
 class CSenderPin : public CBaseOutputPin
 {
@@ -36,12 +35,11 @@ class CSenderFilter: public CBaseFilter
 {
 public:
     CSenderFilter::CSenderFilter();
-    int GetPinCount() { return 2; }
-    CBasePin *GetPin(int n);
+    int GetPinCount() { return 1; }
+    CBasePin *GetPin(int n) { return m_pin; }
 
 private:
-    CSenderPin *m_senderpin;
-    CRenderPin *m_renderpin;
+    CSenderPin *m_pin;
     HRESULT m_hr;
     CCritSec m_csFilter;
 };

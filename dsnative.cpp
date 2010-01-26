@@ -19,13 +19,15 @@
 
 #include "stdafx.h"
 
+BYTE *g_ptr = NULL;
+
 class DSVideoCodec
 {
 public:
     DSVideoCodec::DSVideoCodec(const char *filename, const GUID guid, BITMAPINFOHEADER *bih, unsigned int outfmt) :
-      m_guid(guid), m_bih(bih), m_hDll(NULL), m_outfmt(outfmt), m_pFilter(NULL),
+      m_guid(guid), m_bih(bih), m_hDll(NULL), m_outfmt(outfmt), m_discontinuity(1), m_pFilter(NULL),
       m_pInputPin(NULL), m_pOutputPin(NULL), m_pOurInput(NULL), m_pOurOutput(NULL),
-      m_pImp(NULL), m_pSFilter(NULL)
+      m_pImp(NULL), m_pSFilter(NULL), m_pRFilter(NULL)
     {
         strncpy(m_fname, filename, MAX_PATH);
     }
@@ -85,12 +87,11 @@ public:
     {
         HRESULT res;
 
+        // FIXME: divx needs FORMAT_VideoInfo, avc needs FORMAT_VideoInfo2
         m_pDestType.majortype = MEDIATYPE_Video;
-        m_pDestType.subtype = MEDIASUBTYPE_YV12;
         m_pDestType.formattype = FORMAT_VideoInfo2;
         m_pDestType.bFixedSizeSamples = TRUE;
         m_pDestType.bTemporalCompression = FALSE;
-        m_pDestType.lSampleSize = 1;
         m_pDestType.pUnk = 0;
 
         memset(&m_vi2, 0, sizeof(m_vi2));
@@ -99,14 +100,22 @@ public:
         //m_vi2.bmiHeader.biCompression = 0x32315659;
         //m_vi2.bmiHeader.biBitCount = 12;
         //m_vi2.bmiHeader.biPlanes = 3; // FIXME: planes?
-        m_vi2.bmiHeader.biSizeImage = labs(m_bih->biWidth * m_bih->biHeight * ((m_bih->biBitCount + 7) / 8)) / 2;
+        m_vi2.bmiHeader.biPlanes = 3;
+        m_vi2.bmiHeader.biCompression = m_outfmt;
+
+        m_vi2.rcSource.left = m_vi2.rcSource.top = 0;
+        m_vi2.rcSource.right = m_bih->biWidth;
+        m_vi2.rcSource.bottom = m_bih->biHeight;
+        m_vi2.rcTarget = m_vi2.rcSource;
 
         SetOutputFormat();
 
-        m_pDestType.cbFormat = sizeof(VIDEOINFOHEADER2);
+        m_vi2.bmiHeader.biSizeImage = m_pDestType.lSampleSize = labs(m_bih->biWidth * m_bih->biHeight * ((m_vi2.bmiHeader.biBitCount + 7) / 8));
+
+        m_pDestType.cbFormat = sizeof(m_vi2);
         m_pDestType.pbFormat = (BYTE *) &m_vi2;
 
-        res = m_pOutputPin->QueryAccept(&m_pDestType);
+        //m_vi2.bmiHeader.biHeight *= -1;
 
 #if 0
         memset(&m_viOut, 0, sizeof(m_viOut));
@@ -150,7 +159,7 @@ public:
         m_pOurType.formattype = FORMAT_VideoInfo;
         m_pOurType.bFixedSizeSamples = FALSE;
         m_pOurType.bTemporalCompression = TRUE;
-        m_pOurType.lSampleSize = 1;
+        m_pOurType.lSampleSize = 1; // FIXME: correct ?
         m_pOurType.pUnk = NULL;
 
         switch (m_bih->biCompression)
@@ -244,34 +253,122 @@ public:
 
         m_pSFilter = new CSenderFilter();
         m_pOurInput = (CSenderPin *) m_pSFilter->GetPin(0);
+        m_pRFilter = new CRenderFilter();
+        m_pOurOutput = (CRenderPin *) m_pRFilter->GetPin(0);
 
-        res = m_pInputPin->ReceiveConnection(m_pOurInput, &m_pOurType); 
+        //res = m_pInputPin->ReceiveConnection(m_pOurInput, &m_pOurType); 
+        SetOutputType();
+
+        //res = m_pOurOutput->QueryAccept(&m_pDestType);
+        //res = m_pOutputPin->ReceiveConnection(m_pOurOutput, &m_pDestType);
+        //m_pInputPin->Disconnect();
+        //m_pOurInput->Disconnect();
+
         res = m_pImp->GetAllocator(&m_pAll);
         ALLOCATOR_PROPERTIES props, props1;
 
         props.cBuffers = 1;
-	    props.cbBuffer = m_pOurType.lSampleSize;
+	    props.cbBuffer = m_pDestType.lSampleSize;
 	    props.cbAlign = 1;
 	    props.cbPrefix = 0;
 
         res = m_pAll->SetProperties(&props, &props1);
         res = m_pImp->NotifyAllocator(m_pAll, FALSE);
 
-        m_pOurOutput = (CRenderPin *) m_pSFilter->GetPin(1);
-
-        DebugBreak();
-        SetOutputType();
-        res = m_pOurOutput->QueryAccept(&m_pDestType);
-        res = m_pOutputPin->ReceiveConnection(m_pOurOutput, &m_pDestType);
-        
         return TRUE;
+    }
+
+
+    HRESULT AddToRot(IUnknown *pUnkGraph, DWORD *pdwRegister) 
+    {
+        IMoniker * pMoniker = NULL;
+        IRunningObjectTable *pROT = NULL;
+
+        if (FAILED(GetRunningObjectTable(0, &pROT))) 
+        {
+            return E_FAIL;
+        }
+
+        const size_t STRING_LENGTH = 256;
+
+        WCHAR wsz[STRING_LENGTH];
+
+        StringCchPrintfW(
+            wsz, STRING_LENGTH, 
+            L"FilterGraph %08x pid %08x", 
+            (DWORD_PTR)pUnkGraph, 
+            GetCurrentProcessId()
+            );
+
+        HRESULT hr = CreateItemMoniker(L"!", wsz, &pMoniker);
+        if (SUCCEEDED(hr)) 
+        {
+            hr = pROT->Register(ROTFLAGS_REGISTRATIONKEEPSALIVE, pUnkGraph,
+                pMoniker, pdwRegister);
+            pMoniker->Release();
+        }
+        pROT->Release();
+
+        return hr;
     }
 
     BOOL StartGraph(void)
     {
         HRESULT res;
         res = m_pAll->Commit();
-        res = m_pSFilter->Run(0);
+
+        IGraphBuilder *pGraph = NULL;
+        DWORD dwRegister;
+
+        res = CoCreateInstance(CLSID_FilterGraph, NULL, CLSCTX_INPROC_SERVER, IID_IGraphBuilder, (void **) &pGraph);
+        res = AddToRot(pGraph, &dwRegister);
+
+        //HANDLE hFile = CreateFile("out.log", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        //DWORD r;
+        //const char bom[] = "\xff\xfe";
+        //WriteFile(hFile, bom, 2, &r, NULL);
+        //res = pGraph->SetLogFile((DWORD_PTR) hFile);
+
+        res = pGraph->SetLogFile((DWORD_PTR) GetStdHandle(STD_OUTPUT_HANDLE));
+        
+        res = pGraph->AddFilter(m_pSFilter, L"DS Sender");
+        res = pGraph->AddFilter(m_pRFilter, L"DS Render");
+        res = pGraph->AddFilter(m_pFilter, L"Binary Codec");
+        
+        res = pGraph->ConnectDirect(m_pOurInput, m_pInputPin, &m_pOurType);
+
+        res = m_pOutputPin->QueryAccept(&m_pDestType);
+
+        res = pGraph->ConnectDirect(m_pOurOutput, m_pOutputPin, &m_pDestType);
+        res = pGraph->ConnectDirect(m_pOutputPin, m_pOurOutput, &m_pDestType);
+
+        IMediaControl *pMC = NULL;
+        pGraph->QueryInterface(IID_IMediaControl, (void **) &pMC);    
+        pMC->Run();
+
+        return TRUE;
+    }
+
+    BOOL Decode(const BYTE *src, int size, int is_keyframe, BYTE *pImage)
+    {
+        HRESULT res;
+        IMediaSample* sample = NULL;
+        BYTE *ptr;
+
+        res = m_pAll->GetBuffer(&sample, 0, 0, 0);
+        res = sample->SetActualDataLength(size);
+        res = sample->GetPointer(&ptr);
+        memcpy(ptr, src, size);
+        res = sample->SetSyncPoint(is_keyframe);
+        res = sample->SetPreroll(pImage ? 0 : 1);
+        res = sample->SetDiscontinuity(m_discontinuity);
+        m_discontinuity = 0;
+
+        g_ptr = pImage;
+        //res = m_pOurOutput->Receive(sample); // for debug it displays noise
+        res = m_pImp->Receive(sample);
+
+        sample->Release();
         return TRUE;
     }
 
@@ -362,10 +459,12 @@ private:
     GUID m_guid;
     char m_fname[MAX_PATH + 1];
     unsigned int m_outfmt;
+    int m_discontinuity;
     BITMAPINFOHEADER *m_bih;
     IBaseFilter *m_pFilter;
 
     CSenderFilter *m_pSFilter;
+    CRenderFilter *m_pRFilter;
     CRenderPin *m_pOurOutput;
     CSenderPin *m_pOurInput;
 
@@ -404,6 +503,11 @@ extern "C" void WINAPI DSCloseVideoCodec(DSVideoCodec *vcodec)
     delete vcodec;
 }
 
+extern "C" BOOL WINAPI DSVideoDecode(DSVideoCodec *vcodec, const BYTE *src, int size, int is_keyframe, BYTE *pImage)
+{
+    return vcodec->Decode(src, size, is_keyframe, pImage);
+}
+
 extern "C" BOOL WINAPI DSShowPropertyPage(DSVideoCodec *codec)
 {
     return codec->ShowPropertyPage();
@@ -416,7 +520,9 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved)
         case DLL_PROCESS_ATTACH:
         {
             DisableThreadLibraryCalls(hModule);
-            return (OleInitialize(NULL) == S_OK);
+            BOOL result = (OleInitialize(NULL) == S_OK);
+            DbgSetModuleLevel(0xffffffff, LOG_TRACE);
+            return result;
         }
         case DLL_THREAD_ATTACH:
         case DLL_THREAD_DETACH:
