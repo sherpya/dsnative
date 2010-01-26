@@ -25,7 +25,7 @@ public:
     DSVideoCodec::DSVideoCodec(const char *filename, const GUID guid, BITMAPINFOHEADER *bih, unsigned int outfmt) :
       m_guid(guid), m_bih(bih), m_hDll(NULL), m_outfmt(outfmt), m_pFilter(NULL),
       m_pInputPin(NULL), m_pOutputPin(NULL), m_pOurInput(NULL), m_pOurOutput(NULL),
-      m_pImp(NULL), m_pSFilter(NULL), m_pRFilter(NULL)
+      m_pImp(NULL), m_pSFilter(NULL)
     {
         strncpy(m_fname, filename, MAX_PATH);
     }
@@ -243,7 +243,7 @@ public:
         res = m_pInputPin->QueryAccept(&m_pOurType);
 
         m_pSFilter = new CSenderFilter();
-        m_pOurInput = (CSenderPin *) m_pSFilter->GetPin();
+        m_pOurInput = (CSenderPin *) m_pSFilter->GetPin(0);
 
         res = m_pInputPin->ReceiveConnection(m_pOurInput, &m_pOurType); 
         res = m_pImp->GetAllocator(&m_pAll);
@@ -257,14 +257,21 @@ public:
         res = m_pAll->SetProperties(&props, &props1);
         res = m_pImp->NotifyAllocator(m_pAll, FALSE);
 
-        m_pRFilter = new CRenderFilter();
-        m_pOurOutput = (CRenderPin *) m_pRFilter->GetPin();
+        m_pOurOutput = (CRenderPin *) m_pSFilter->GetPin(1);
 
         DebugBreak();
         SetOutputType();
         res = m_pOurOutput->QueryAccept(&m_pDestType);
         res = m_pOutputPin->ReceiveConnection(m_pOurOutput, &m_pDestType);
         
+        return TRUE;
+    }
+
+    BOOL StartGraph(void)
+    {
+        HRESULT res;
+        res = m_pAll->Commit();
+        res = m_pSFilter->Run(0);
         return TRUE;
     }
 
@@ -359,7 +366,6 @@ private:
     IBaseFilter *m_pFilter;
 
     CSenderFilter *m_pSFilter;
-    CRenderFilter *m_pRFilter;
     CRenderPin *m_pOurOutput;
     CSenderPin *m_pOurInput;
 
@@ -386,6 +392,8 @@ extern "C" DSVideoCodec * WINAPI DSOpenVideoCodec(const char *dll, const GUID gu
     if (!vcodec->CreateFilter())
         return NULL;
     if (!vcodec->CreateGraph())
+        return NULL;
+    if (!vcodec->StartGraph())
         return NULL;
     return vcodec;
 }

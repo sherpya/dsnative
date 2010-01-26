@@ -17,28 +17,15 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-class CRenderFilter;
+class CSenderFilter;
 class CRenderPin;
 
 class CRenderPin : public CBaseInputPin
 {
 public:
-    CRenderPin::CRenderPin(HRESULT *phr, CRenderFilter *pFilter, CCritSec *pLock);
+    CRenderPin::CRenderPin(HRESULT *phr, CSenderFilter *pFilter, CCritSec *pLock);
     HRESULT CheckMediaType(const CMediaType *);
 
     HRESULT STDMETHODCALLTYPE BeginFlush(void) { return E_NOTIMPL; }
     HRESULT STDMETHODCALLTYPE EndFlush(void) { return E_NOTIMPL; }
-};
-
-class CRenderFilter: public CBaseFilter
-{
-public:
-    CRenderFilter::CRenderFilter();
-    int GetPinCount() { return 1; }
-    CBasePin *GetPin(int n=1) { return m_pin; }
-
-private:
-    CRenderPin *m_pin;
-    HRESULT m_hr;
-    CCritSec m_csFilter;
 };

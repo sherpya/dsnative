@@ -38,5 +38,17 @@ HRESULT CSenderPin::CheckMediaType(const CMediaType *)
 CSenderFilter::CSenderFilter() : CBaseFilter(NAME("CSenderFilter"), NULL, &m_csFilter, GUID_NULL)
 {
     fprintf(stderr, "CSenderFilter::CSenderFilter\n");
-    m_pin = new CSenderPin(&m_hr, this, &m_csFilter);
+    m_senderpin = new CSenderPin(&m_hr, this, &m_csFilter);
+    m_renderpin = new CRenderPin(&m_hr, this, &m_csFilter);
+}
+
+CBasePin *CSenderFilter::GetPin(int n)
+{
+    fprintf(stderr, "CSenderFilter::GetPin -> %d\n", n);
+    switch (n)
+    {
+        case 0: return m_senderpin;
+        case 1: return m_renderpin;
+    }
+    return NULL;
 }
