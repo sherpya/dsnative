@@ -85,7 +85,7 @@ public:
     {
         // FIXME: divx needs FORMAT_VideoInfo, avc needs FORMAT_VideoInfo2
         m_pDestType.majortype = MEDIATYPE_Video;
-        m_pDestType.formattype = FORMAT_VideoInfo2;
+        m_pDestType.formattype = FORMAT_VideoInfo;
         m_pDestType.bFixedSizeSamples = TRUE;
         m_pDestType.bTemporalCompression = FALSE;
         m_pDestType.pUnk = 0;
@@ -468,7 +468,7 @@ private:
     AM_MEDIA_TYPE m_pOurType, m_pDestType;
     MPEG2VIDEOINFO m_mp2vi;
     VIDEOINFOHEADER m_vi, m_viOut;
-    VIDEOINFOHEADER2 m_vi2;
+    VIDEOINFOHEADER m_vi2;
 };
 
 
