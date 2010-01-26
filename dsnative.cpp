@@ -139,9 +139,9 @@ public:
         memset(&m_vi2, 0, sizeof(m_vi2));
         memcpy(&m_vi2.bmiHeader, m_bih, sizeof(m_vi2.bmiHeader));
         m_vi2.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-        m_vi2.bmiHeader.biCompression = 0x32315659;
-        m_vi2.bmiHeader.biBitCount = 12;
-        m_vi2.bmiHeader.biPlanes = 3;
+        //m_vi2.bmiHeader.biCompression = 0x32315659;
+        //m_vi2.bmiHeader.biBitCount = 12;
+        //m_vi2.bmiHeader.biPlanes = 3;
         m_vi2.bmiHeader.biSizeImage = labs(m_bih->biWidth * m_bih->biHeight * ((m_bih->biBitCount + 7) / 8)) / 2;
 
         m_pDestType.cbFormat = sizeof(VIDEOINFOHEADER2);
@@ -312,11 +312,9 @@ public:
         m_pRFilter = new CRenderFilter();
         m_pOurOutput = (CRenderPin *) m_pRFilter->GetPin();
 
+        DebugBreak();
         SetOutputType();
         res = m_pOurOutput->QueryAccept(&m_pDestType);
-
-        DebugBreak();
-
         res = m_pOutputPin->ReceiveConnection(m_pOurOutput, &m_pDestType);
         
         return TRUE;
