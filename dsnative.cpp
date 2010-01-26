@@ -19,54 +19,11 @@
 
 #include "stdafx.h"
 
-#define fccYUV  mmioFOURCC('Y', 'U', 'V', ' ')
-#define fccYUY2 mmioFOURCC('Y', 'U', 'Y', '2')
-#define fccYV12 mmioFOURCC('Y', 'V', '1', '2')/* Planar mode: Y + V + U  (3 planes) */
-#define fccI420 mmioFOURCC('I', '4', '2', '0')
-#define fccIYUV mmioFOURCC('I', 'Y', 'U', 'V')/* Planar mode: Y + U + V  (3 planes) */
-#define fccUYVY mmioFOURCC('U', 'Y', 'V', 'Y')/* Packed mode: U0+Y0+V0+Y1 (1 plane) */
-#define fccYVYU mmioFOURCC('Y', 'V', 'Y', 'U')/* Packed mode: Y0+V0+Y1+U0 (1 plane) */
-#define fccYVU9 mmioFOURCC('Y', 'V', 'U', '9')/* Planar 4:1:0 */
-#define fccIF09 mmioFOURCC('I', 'F', '0', '9')/* Planar 4:1:0 + delta */
-
-enum CAPS
-{
-    CAP_NONE = 0,
-    CAP_YUY2 = 1,
-    CAP_YV12 = 2,
-    CAP_IYUV = 4,
-    CAP_UYVY = 8,
-    CAP_YVYU = 16,
-    CAP_I420 = 32,
-    CAP_YVU9 = 64,
-    CAP_IF09 = 128,
-};
-
-typedef struct _ct
-{
-    unsigned int bits;
-    unsigned int fcc;
-    const GUID *subtype;
-    int cap;
-} ct;
-            
-static ct check[] = {
-        {16, fccYUY2, &MEDIASUBTYPE_YUY2, CAP_YUY2},
-        {12, fccIYUV, &MEDIASUBTYPE_IYUV, CAP_IYUV},
-        {16, fccUYVY, &MEDIASUBTYPE_UYVY, CAP_UYVY},
-        {12, fccYV12, &MEDIASUBTYPE_YV12, CAP_YV12},
-        {16, fccYV12, &MEDIASUBTYPE_YV12, CAP_YV12},
-        {16, fccYVYU, &MEDIASUBTYPE_YVYU, CAP_YVYU},
-//        {12, fccI420, &MEDIASUBTYPE_I420, CAP_I420},
-        {9,  fccYVU9, &MEDIASUBTYPE_YVU9, CAP_YVU9},
-        {0, 0, 0, 0},
-        };
-
 class DSVideoCodec
 {
 public:
-    DSVideoCodec::DSVideoCodec(const char *filename, const GUID guid, BITMAPINFOHEADER *bih) :
-      m_guid(guid), m_bih(bih), m_hDll(NULL), m_pFilter(NULL),
+    DSVideoCodec::DSVideoCodec(const char *filename, const GUID guid, BITMAPINFOHEADER *bih, unsigned int outfmt) :
+      m_guid(guid), m_bih(bih), m_hDll(NULL), m_outfmt(outfmt), m_pFilter(NULL),
       m_pInputPin(NULL), m_pOutputPin(NULL), m_pOurInput(NULL), m_pOurOutput(NULL),
       m_pImp(NULL), m_pSFilter(NULL), m_pRFilter(NULL)
     {
@@ -141,25 +98,16 @@ public:
         m_vi2.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
         //m_vi2.bmiHeader.biCompression = 0x32315659;
         //m_vi2.bmiHeader.biBitCount = 12;
-        //m_vi2.bmiHeader.biPlanes = 3;
+        //m_vi2.bmiHeader.biPlanes = 3; // FIXME: planes?
         m_vi2.bmiHeader.biSizeImage = labs(m_bih->biWidth * m_bih->biHeight * ((m_bih->biBitCount + 7) / 8)) / 2;
+
+        SetOutputFormat();
 
         m_pDestType.cbFormat = sizeof(VIDEOINFOHEADER2);
         m_pDestType.pbFormat = (BYTE *) &m_vi2;
 
         res = m_pOutputPin->QueryAccept(&m_pDestType);
-#if 0
-        printf("Decoder supports the following YUV formats:\n");
-        ct* c;
-        for (c = check; c->bits; c++)
-        {
-            m_viOut.bmiHeader.biBitCount = c->bits;
-            m_viOut.bmiHeader.biCompression = c->fcc;
-            m_pDestType.subtype = *c->subtype;
-            res = m_pOutputPin->QueryAccept(&m_pDestType);
-            printf("%.4s : %s\n", (char *) &c->fcc, (res == S_OK) ? "yes" : "no");
-        }
-#endif
+
 #if 0
         memset(&m_viOut, 0, sizeof(m_viOut));
 
@@ -362,10 +310,51 @@ public:
         return (!FAILED(res));
     }
 
+    void SetOutputFormat(void)
+    {
+        switch (m_outfmt)
+        {
+            // YUV
+            case mmioFOURCC('Y', 'U', 'Y', '2'):
+                m_pDestType.subtype = MEDIASUBTYPE_YUY2;
+                m_vi2.bmiHeader.biBitCount = 16;
+                break;
+            case mmioFOURCC('U', 'Y', 'V', 'Y'):
+                m_pDestType.subtype = MEDIASUBTYPE_UYVY;
+                m_vi2.bmiHeader.biBitCount = 16;
+                break;
+            case mmioFOURCC('Y', 'V', '1', '2'):
+                m_pDestType.subtype = MEDIASUBTYPE_YV12;
+                m_vi2.bmiHeader.biBitCount = 12;
+                break;
+            case mmioFOURCC('I', 'Y', 'U', 'V'):
+                m_pDestType.subtype = MEDIASUBTYPE_IYUV;
+                m_vi2.bmiHeader.biBitCount = 12;
+                break;
+            case mmioFOURCC('Y', 'V', 'U', '9'):
+                m_pDestType.subtype = MEDIASUBTYPE_YVU9;
+                m_vi2.bmiHeader.biBitCount = 9;
+                break;
+            default: // RGB // FIXME: 'R', 'G', 'B', bits ??
+                {
+                    unsigned int bits = m_outfmt & 0xff;
+                    m_vi2.bmiHeader.biBitCount = bits;
+                    switch (bits)
+                    {
+                        case 15: m_pDestType.subtype = MEDIASUBTYPE_RGB555; break;
+                        case 16: m_pDestType.subtype = MEDIASUBTYPE_RGB565; break;
+                        case 24: m_pDestType.subtype = MEDIASUBTYPE_RGB24; break;
+                        case 32: m_pDestType.subtype = MEDIASUBTYPE_RGB32; break;
+                    }
+                }
+        }
+    }
+
 private:
     HMODULE m_hDll;
     GUID m_guid;
     char m_fname[MAX_PATH + 1];
+    unsigned int m_outfmt;
     BITMAPINFOHEADER *m_bih;
     IBaseFilter *m_pFilter;
 
@@ -386,9 +375,9 @@ private:
 };
 
 
-extern "C" DSVideoCodec * WINAPI DSOpenVideoCodec(const char *dll, const GUID guid, BITMAPINFOHEADER* bih)
+extern "C" DSVideoCodec * WINAPI DSOpenVideoCodec(const char *dll, const GUID guid, BITMAPINFOHEADER* bih, unsigned int outfmt)
 {
-    DSVideoCodec *vcodec = new DSVideoCodec(dll, guid, bih);
+    DSVideoCodec *vcodec = new DSVideoCodec(dll, guid, bih, outfmt);
     if (!vcodec->LoadLibrary())
     {
         fprintf(stderr, "LoadLibrary Failed %d\n", GetLastError());
