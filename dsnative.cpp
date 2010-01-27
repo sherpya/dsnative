@@ -83,65 +83,49 @@ public:
 
     BOOL SetOutputType(void)
     {
-        // FIXME: divx needs FORMAT_VideoInfo, avc needs FORMAT_VideoInfo2
         m_pDestType.majortype = MEDIATYPE_Video;
-        m_pDestType.formattype = FORMAT_VideoInfo;
         m_pDestType.bFixedSizeSamples = TRUE;
         m_pDestType.bTemporalCompression = FALSE;
         m_pDestType.pUnk = 0;
 
+        memset(&m_vi, 0, sizeof(m_vi));
+        memcpy(&m_vi.bmiHeader, m_bih, sizeof(m_vi.bmiHeader));
+
         memset(&m_vi2, 0, sizeof(m_vi2));
         memcpy(&m_vi2.bmiHeader, m_bih, sizeof(m_vi2.bmiHeader));
-        m_vi2.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-        m_vi2.bmiHeader.biCompression = m_outfmt;
-        m_vi2.bmiHeader.biPlanes = 1;
-        
-        SetOutputFormat(&m_vi2.bmiHeader.biBitCount, &m_vi2.bmiHeader.biPlanes);
 
-        m_vi2.rcSource.left = m_vi2.rcSource.top = 0;
-        m_vi2.rcSource.right = m_bih->biWidth;
-        m_vi2.rcSource.bottom = m_bih->biHeight;
-        m_vi2.rcTarget = m_vi2.rcSource;
+        m_vi.bmiHeader.biSize = m_vi2.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        m_vi.bmiHeader.biCompression = m_vi2.bmiHeader.biCompression = m_outfmt;
 
-        m_vi2.bmiHeader.biSizeImage = m_pDestType.lSampleSize = labs(m_bih->biWidth * m_bih->biHeight * ((m_vi2.bmiHeader.biBitCount + 7) / 8));
+        m_vi.bmiHeader.biPlanes = 1;
+        SetOutputFormat(&m_vi.bmiHeader.biBitCount, &m_vi.bmiHeader.biPlanes);
+        m_vi2.bmiHeader.biBitCount = m_vi.bmiHeader.biBitCount;
+        m_vi2.bmiHeader.biPlanes = m_vi.bmiHeader.biPlanes;
 
-        m_pDestType.cbFormat = sizeof(m_vi2);
-        m_pDestType.pbFormat = (BYTE *) &m_vi2;
+        RECT rImg = { 0 /* left */, 0 /* top */, m_bih->biWidth /* right */, m_bih->biHeight /* bottom */};
+        m_vi.rcSource = m_vi2.rcSource = m_vi.rcTarget = m_vi2.rcTarget = rImg;
 
         //m_vi2.bmiHeader.biHeight *= -1;
 
-#if 0
-        memset(&m_viOut, 0, sizeof(m_viOut));
+        m_vi.bmiHeader.biSizeImage = m_pDestType.lSampleSize = labs(m_bih->biWidth * m_bih->biHeight * ((m_vi.bmiHeader.biBitCount + 7) / 8));
+        m_vi2.bmiHeader.biSizeImage = m_vi.bmiHeader.biSizeImage;
 
-        m_viOut.rcSource.left = m_viOut.rcSource.top = 0;
-        m_viOut.rcSource.right = m_bih->biWidth;
-        m_viOut.rcSource.bottom = m_bih->biHeight;
-        m_viOut.rcTarget = m_viOut.rcSource;
-
-        memcpy(&m_viOut.bmiHeader, m_bih, sizeof(BITMAPINFOHEADER));
-        m_viOut.bmiHeader.biSizeImage = m_pDestType.lSampleSize;
-
-        m_viOut.bmiHeader.biCompression = 0;
-        m_viOut.bmiHeader.biBitCount = 24;
-
-        m_pDestType.cbFormat = sizeof(VIDEOINFOHEADER);
-        m_pDestType.pbFormat = (BYTE *) &m_viOut;
-
-        //m_viOut.bmiHeader.biHeight *= -1;
-
+        // try FORMAT_VideoInfo
+        m_pDestType.formattype = FORMAT_VideoInfo;
+        m_pDestType.cbFormat = sizeof(m_vi);
+        m_pDestType.pbFormat = (BYTE *) &m_vi;
         m_res = m_pOutputPin->QueryAccept(&m_pDestType);
-        printf("Decoder supports the following YUV formats:\n");
-        ct* c;
-        for (c = check; c->bits; c++)
+
+        // try FORMAT_VideoInfo2
+        if (m_res != S_OK)
         {
-            m_viOut.bmiHeader.biBitCount = c->bits;
-            m_viOut.bmiHeader.biCompression = c->fcc;
-            m_pDestType.subtype = *c->subtype;
+            m_pDestType.formattype = FORMAT_VideoInfo2;
+            m_pDestType.cbFormat = sizeof(m_vi2);
+            m_pDestType.pbFormat = (BYTE *) &m_vi2;
             m_res = m_pOutputPin->QueryAccept(&m_pDestType);
-            printf("%.4s : %s\n", (char *) &c->fcc, (m_res == S_OK) ? "yes" : "no");
         }
-#endif
-        return TRUE;
+
+        return (m_res == S_OK);
     }
 
     BOOL SetInputType(void)
@@ -264,9 +248,6 @@ public:
         m_pRFilter = new CRenderFilter();
         m_pOurOutput = (CRenderPin *) m_pRFilter->GetPin(0);
 
-        
-        SetOutputType();
-
         m_res = CoCreateInstance(CLSID_FilterGraph, NULL, CLSCTX_INPROC_SERVER, IID_IGraphBuilder, (void **) &m_pGraph);
         m_res = AddToRot(m_pGraph, &m_dwRegister);
         m_pGraph->QueryInterface(IID_IMediaControl, (void **) &m_pMC);    
@@ -286,20 +267,10 @@ public:
         // Connect our output pin to codec input pin otherwise QueryAccept on the codec output pin will fail
         //m_res = m_pInputPin->ReceiveConnection(m_pOurInput, &m_pOurType); 
         m_res = m_pGraph->ConnectDirect(m_pOurInput, m_pInputPin, &m_pOurType);
-
-        m_res = m_pOutputPin->QueryAccept(&m_pDestType);
+        SetOutputType();
 
         m_res = m_pGraph->ConnectDirect(m_pOurOutput, m_pOutputPin, &m_pDestType);
         m_res = m_pGraph->ConnectDirect(m_pOutputPin, m_pOurOutput, &m_pDestType);
-        
-        
-        
-
-        //m_res = m_pOurOutput->QueryAccept(&m_pDestType);
-        //m_res = m_pOutputPin->ReceiveConnection(m_pOurOutput, &m_pDestType);
-        //m_pInputPin->Disconnect();
-        //m_pOurInput->Disconnect();
-
 
         return TRUE;
     }
@@ -476,8 +447,8 @@ private:
     IMemAllocator *m_pAll;
     AM_MEDIA_TYPE m_pOurType, m_pDestType;
     MPEG2VIDEOINFO m_mp2vi;
-    VIDEOINFOHEADER m_vi, m_viOut;
-    VIDEOINFOHEADER m_vi2;
+    VIDEOINFOHEADER m_vi;
+    VIDEOINFOHEADER2 m_vi2;
 };
 
 
