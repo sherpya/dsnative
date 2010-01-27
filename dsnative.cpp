@@ -93,18 +93,15 @@ public:
         memset(&m_vi2, 0, sizeof(m_vi2));
         memcpy(&m_vi2.bmiHeader, m_bih, sizeof(m_vi2.bmiHeader));
         m_vi2.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-        //m_vi2.bmiHeader.biCompression = 0x32315659;
-        //m_vi2.bmiHeader.biBitCount = 12;
-        //m_vi2.bmiHeader.biPlanes = 3; // FIXME: planes?
-        m_vi2.bmiHeader.biPlanes = 3;
         m_vi2.bmiHeader.biCompression = m_outfmt;
+        m_vi2.bmiHeader.biPlanes = 1;
+        
+        SetOutputFormat(&m_vi2.bmiHeader.biBitCount, &m_vi2.bmiHeader.biPlanes);
 
         m_vi2.rcSource.left = m_vi2.rcSource.top = 0;
         m_vi2.rcSource.right = m_bih->biWidth;
         m_vi2.rcSource.bottom = m_bih->biHeight;
         m_vi2.rcTarget = m_vi2.rcSource;
-
-        SetOutputFormat();
 
         m_vi2.bmiHeader.biSizeImage = m_pDestType.lSampleSize = labs(m_bih->biWidth * m_bih->biHeight * ((m_vi2.bmiHeader.biBitCount + 7) / 8));
 
@@ -411,35 +408,37 @@ public:
         return (!FAILED(m_res));
     }
 
-    void SetOutputFormat(void)
+    void SetOutputFormat(WORD *biBitCount, WORD *biPlanes)
     {
         switch (m_outfmt)
         {
             // YUV
             case mmioFOURCC('Y', 'U', 'Y', '2'):
                 m_pDestType.subtype = MEDIASUBTYPE_YUY2;
-                m_vi2.bmiHeader.biBitCount = 16;
+                *biBitCount = 16;
                 break;
             case mmioFOURCC('U', 'Y', 'V', 'Y'):
                 m_pDestType.subtype = MEDIASUBTYPE_UYVY;
-                m_vi2.bmiHeader.biBitCount = 16;
+                *biBitCount = 16;
                 break;
             case mmioFOURCC('Y', 'V', '1', '2'):
                 m_pDestType.subtype = MEDIASUBTYPE_YV12;
-                m_vi2.bmiHeader.biBitCount = 12;
+                *biBitCount = 12;
+                *biPlanes = 3;
                 break;
             case mmioFOURCC('I', 'Y', 'U', 'V'):
                 m_pDestType.subtype = MEDIASUBTYPE_IYUV;
-                m_vi2.bmiHeader.biBitCount = 12;
+                *biBitCount = 12;
+                *biPlanes = 3;
                 break;
             case mmioFOURCC('Y', 'V', 'U', '9'):
                 m_pDestType.subtype = MEDIASUBTYPE_YVU9;
-                m_vi2.bmiHeader.biBitCount = 9;
+                *biBitCount = 9;
                 break;
             default: // RGB // FIXME: 'R', 'G', 'B', bits ??
                 {
                     unsigned int bits = m_outfmt & 0xff;
-                    m_vi2.bmiHeader.biBitCount = bits;
+                    *biBitCount = bits;
                     switch (bits)
                     {
                         case 15: m_pDestType.subtype = MEDIASUBTYPE_RGB555; break;
