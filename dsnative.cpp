@@ -249,7 +249,7 @@ public:
         m_pOurOutput = (CRenderPin *) m_pRFilter->GetPin(0);
 
         m_res = CoCreateInstance(CLSID_FilterGraph, NULL, CLSCTX_INPROC_SERVER, IID_IGraphBuilder, (void **) &m_pGraph);
-        m_res = AddToRot(m_pGraph, &m_dwRegister);
+        m_res = DSVideoCodec::AddToRot(m_pGraph, &m_dwRegister);
         m_pGraph->QueryInterface(IID_IMediaControl, (void **) &m_pMC);    
 
         //HANDLE hFile = CreateFile("out.log", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -275,8 +275,7 @@ public:
         return TRUE;
     }
 
-
-    HRESULT AddToRot(IUnknown *pUnkGraph, DWORD *pdwRegister) 
+    static HRESULT AddToRot(IUnknown *pUnkGraph, DWORD *pdwRegister) 
     {
         IMoniker *pMoniker = NULL;
         IRunningObjectTable *pROT = NULL;
@@ -295,6 +294,17 @@ public:
         pROT->Release();
 
         return hr;
+    }
+
+
+    static void RemoveFromRot(DWORD pdwRegister)
+    {
+        IRunningObjectTable *pROT;
+        if (SUCCEEDED(GetRunningObjectTable(0, &pROT)))
+        {
+            pROT->Revoke(pdwRegister);
+            pROT->Release();
+        }
     }
 
     BOOL StartGraph(void)
