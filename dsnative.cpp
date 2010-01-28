@@ -30,6 +30,37 @@ public:
         strncpy(m_fname, filename, MAX_PATH);
     }
 
+    DSVideoCodec::~DSVideoCodec()
+    {
+        ReleaseGraph();
+    }
+
+    void ReleaseGraph(void)
+    {
+        if (m_pMC)
+            m_pMC->Stop();
+
+        if (m_pGraph)
+        {
+            RemoveFromRot(m_dwRegister);
+
+            m_pGraph->Disconnect(m_pOurInput);
+            m_pGraph->Disconnect(m_pOurOutput);
+            m_pGraph->Disconnect(m_pInputPin);
+            m_pGraph->Disconnect(m_pOutputPin);
+
+            m_pGraph->RemoveFilter(m_pSFilter);
+            m_pGraph->RemoveFilter(m_pRFilter);
+            m_pGraph->RemoveFilter(m_pFilter);
+
+            m_pImp->Release();
+            m_pInputPin->Release();
+            m_pOutputPin->Release();
+
+            m_pGraph->Release();
+        }
+    }
+
     BOOL LoadLibrary(void)
     {
         return ((m_hDll = ::LoadLibrary(m_fname)) != NULL);
@@ -54,11 +85,6 @@ public:
         object->Release();
 
         return (!FAILED(m_res));
-    }
-
-    BOOL ReleaseFilter(void)
-    {
-        return m_pFilter->Release();
     }
 
     BOOL CheckMediaTypes(IPin *pin)
@@ -452,23 +478,23 @@ private:
 extern "C" DSVideoCodec * WINAPI DSOpenVideoCodec(const char *dll, const GUID guid, BITMAPINFOHEADER* bih, unsigned int outfmt)
 {
     DSVideoCodec *vcodec = new DSVideoCodec(dll, guid, bih, outfmt);
+
     if (!vcodec->LoadLibrary())
     {
         fprintf(stderr, "LoadLibrary Failed %d\n", GetLastError());
+        delete vcodec;
         return NULL;
     }
-    if (!vcodec->CreateFilter())
-        return NULL;
-    if (!vcodec->CreateGraph())
-        return NULL;
-    if (!vcodec->StartGraph())
-        return NULL;
-    return vcodec;
+
+    if (vcodec->CreateFilter() && vcodec->CreateGraph() && vcodec->StartGraph())
+        return vcodec;
+
+    delete vcodec;
+    return NULL;
 }
 
 extern "C" void WINAPI DSCloseVideoCodec(DSVideoCodec *vcodec)
 {
-    vcodec->ReleaseFilter();
     delete vcodec;
 }
 
