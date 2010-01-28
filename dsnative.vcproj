@@ -217,10 +217,6 @@
 				>
 			</File>
 			<File
-				RelativePath=".\renderpin.h"
-				>
-			</File>
-			<File
 				RelativePath=".\stdafx.h"
 				>
 			</File>
