@@ -45,10 +45,4 @@
 
 #include <commctrl.h>
 
-#include "senderpin.h"
-#include "renderpin.h"
-
-//#include "inputpin.h"
-//#include "outputpin.h"
-
-// TODO: reference additional headers your program requires here
+#include "dsnpins.h"

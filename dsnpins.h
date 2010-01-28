@@ -43,3 +43,35 @@ private:
     HRESULT m_hr;
     CCritSec m_csFilter;
 };
+
+class CRenderFilter;
+class CRenderPin;
+
+class CRenderPin : public CBaseInputPin
+{
+public:
+    CRenderPin::CRenderPin(HRESULT *phr, CRenderFilter *pFilter, CCritSec *pLock);
+    HRESULT CheckMediaType(const CMediaType *) { return S_OK; };
+    HRESULT STDMETHODCALLTYPE Receive(IMediaSample *pSample);
+
+    HRESULT STDMETHODCALLTYPE BeginFlush(void) { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE EndFlush(void) { return E_NOTIMPL; }
+
+    void SetPointer(BYTE *ptr) { m_gPtr = ptr; }
+
+private:
+    BYTE *m_gPtr;
+};
+
+class CRenderFilter: public CBaseFilter
+{
+public:
+    CRenderFilter::CRenderFilter();
+    int GetPinCount() { return 1; }
+    CBasePin *GetPin(int n) { return m_pin; }
+
+private:
+    CRenderPin *m_pin;
+    HRESULT m_hr;
+    CCritSec m_csFilter;
+};
