@@ -19,8 +19,6 @@
 
 #include "stdafx.h"
 
-BYTE *g_ptr = NULL;
-
 class DSVideoCodec
 {
 public:
@@ -329,7 +327,7 @@ public:
         m_res = sample->SetDiscontinuity(m_discontinuity);
         m_discontinuity = 0;
 
-        g_ptr = pImage;
+        m_pOurOutput->SetPointer(pImage);
         //m_res = m_pOurOutput->Receive(sample); // for debug it displays noise
         m_res = m_pImp->Receive(sample);
 

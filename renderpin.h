@@ -29,6 +29,11 @@ public:
 
     HRESULT STDMETHODCALLTYPE BeginFlush(void) { return E_NOTIMPL; }
     HRESULT STDMETHODCALLTYPE EndFlush(void) { return E_NOTIMPL; }
+
+    void SetPointer(BYTE *ptr) { m_gPtr = ptr; }
+
+private:
+    BYTE *m_gPtr;
 };
 
 class CRenderFilter: public CBaseFilter

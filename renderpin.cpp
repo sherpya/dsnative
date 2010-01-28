@@ -19,7 +19,7 @@
 
 #include "stdafx.h"
 
-CRenderPin::CRenderPin(HRESULT *phr, CRenderFilter *pFilter, CCritSec *pLock) : CBaseInputPin(NAME("CRenderPin"), pFilter, pLock, phr, L"Render")
+CRenderPin::CRenderPin(HRESULT *phr, CRenderFilter *pFilter, CCritSec *pLock) : m_gPtr(NULL), CBaseInputPin(NAME("CRenderPin"), pFilter, pLock, phr, L"Render")
 {
     fprintf(stderr, "CRenderPin::CRenderPin\n");
 }
@@ -33,11 +33,11 @@ HRESULT CRenderPin::CheckMediaType(const CMediaType *)
 
 HRESULT CRenderPin::Receive(IMediaSample *pSample)
 {
-    // FIXME: move global pointer to classdata
     BYTE *ptr;
+    assert(m_gPtr);
     pSample->GetPointer(&ptr);
     long len = pSample->GetActualDataLength();
-    memcpy(g_ptr, ptr, len);
+    memcpy(m_gPtr, ptr, len);
     return S_OK;
 }
 

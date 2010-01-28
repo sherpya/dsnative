@@ -48,8 +48,6 @@
 #include "senderpin.h"
 #include "renderpin.h"
 
-extern BYTE *g_ptr;
-
 //#include "inputpin.h"
 //#include "outputpin.h"
 
