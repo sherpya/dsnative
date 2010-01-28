@@ -320,6 +320,7 @@ public:
         BYTE *ptr;
 
         m_res = m_pAll->GetBuffer(&sample, 0, 0, 0);
+        if (m_res != S_OK) return FALSE;
         m_res = sample->SetActualDataLength(size);
         m_res = sample->GetPointer(&ptr);
         memcpy(ptr, src, size);
