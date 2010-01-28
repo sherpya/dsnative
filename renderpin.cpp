@@ -24,13 +24,6 @@ CRenderPin::CRenderPin(HRESULT *phr, CRenderFilter *pFilter, CCritSec *pLock) : 
     fprintf(stderr, "CRenderPin::CRenderPin\n");
 }
 
-HRESULT CRenderPin::CheckMediaType(const CMediaType *)
-{
-    // FIXME
-    //fprintf(stderr, "CRenderPin::CheckMediaType\n");
-    return S_OK;
-}
-
 HRESULT CRenderPin::Receive(IMediaSample *pSample)
 {
     BYTE *ptr;

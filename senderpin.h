@@ -24,7 +24,7 @@ class CSenderPin : public CBaseOutputPin
 {
 public:
     CSenderPin::CSenderPin(HRESULT *phr, CSenderFilter *pFilter, CCritSec *pLock);
-    HRESULT CheckMediaType(const CMediaType *);
+    HRESULT CheckMediaType(const CMediaType *) { return S_OK; };
     HRESULT DecideBufferSize(IMemAllocator *pAlloc, ALLOCATOR_PROPERTIES *ppropInputRequest);
 
     HRESULT STDMETHODCALLTYPE BeginFlush(void) { return E_NOTIMPL; }

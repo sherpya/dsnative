@@ -34,12 +34,6 @@ HRESULT CSenderPin::DecideBufferSize(IMemAllocator *pAlloc, ALLOCATOR_PROPERTIES
     return S_OK;
 }
 
-HRESULT CSenderPin::CheckMediaType(const CMediaType *)
-{
-    fprintf(stderr, "CSenderPin::CheckMediaType\n");
-    return S_OK;
-}
-
 CSenderFilter::CSenderFilter() : CBaseFilter(NAME("CSenderFilter"), NULL, &m_csFilter, GUID_NULL)
 {
     fprintf(stderr, "CSenderFilter::CSenderFilter\n");

@@ -24,7 +24,7 @@ class CRenderPin : public CBaseInputPin
 {
 public:
     CRenderPin::CRenderPin(HRESULT *phr, CRenderFilter *pFilter, CCritSec *pLock);
-    HRESULT CheckMediaType(const CMediaType *);
+    HRESULT CheckMediaType(const CMediaType *) { return S_OK; };
     HRESULT STDMETHODCALLTYPE Receive(IMediaSample *pSample);
 
     HRESULT STDMETHODCALLTYPE BeginFlush(void) { return E_NOTIMPL; }
