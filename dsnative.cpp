@@ -249,8 +249,11 @@ public:
         int size = sizeof(MPEG2VIDEOINFO);
         if (extra > 0)
         {
-            m_mp2vi.dwFlags = AMMPEG2_DVDLine21Field2; /* uh? */
+            BYTE *extradata = (BYTE *) m_bih + sizeof(BITMAPINFOHEADER) + 4;
+            m_mp2vi.dwFlags = (*extradata & 0x3) + 1;
+            printf("NALU length field size %d\n", m_mp2vi.dwFlags);
             m_mp2vi.cbSequenceHeader = avc_quant((BYTE *)(m_bih) + sizeof(BITMAPINFOHEADER), (BYTE *)(&m_mp2vi.dwSequenceHeader[0]), extra);
+            // The '4' is from the allocated space of dwSequenceHeader
             size += m_mp2vi.cbSequenceHeader - 4;
         }
 
