@@ -411,12 +411,13 @@ public:
         return TRUE;
     }
 
-    BOOL Resync(void)
+    BOOL Resync(REFERENCE_TIME pts)
     {
+        /* It really does something useful? */
         /* often E_NOTIMPL */
-        m_pInputPin->BeginFlush();
-        m_pInputPin->EndFlush();
-        m_res = m_pInputPin->NewSegment(0, 0, 1);
+        //m_pInputPin->BeginFlush();
+        //m_pInputPin->EndFlush();
+        m_res = m_pInputPin->NewSegment(pts, 0, 1);
         m_discontinuity = 1;
         return (m_res == S_OK);
     }
@@ -569,9 +570,9 @@ extern "C" BOOL WINAPI DSVideoDecode(DSVideoCodec *vcodec, const BYTE *src, int 
     return vcodec->Decode(src, size, pts, is_keyframe, pImage);
 }
 
-extern "C" BOOL WINAPI DSVideoResync(DSVideoCodec *vcodec)
+extern "C" BOOL WINAPI DSVideoResync(DSVideoCodec *vcodec, uint64_t pts)
 {
-    return vcodec->Resync();
+    return vcodec->Resync(pts);
 }
 
 extern "C" BOOL WINAPI DSShowPropertyPage(DSVideoCodec *codec)
