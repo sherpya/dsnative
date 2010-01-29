@@ -204,6 +204,34 @@ public:
         return TRUE;
     }
 
+    DWORD avc_quant(BYTE *src, BYTE *dst, int len)
+    {
+        // Stolen from libavcodec h264.c
+        BYTE *p = src, *d = dst;
+        int cnt;
+
+        cnt = *(p + 5) & 0x1f; // Number of sps
+
+        if (src[0] != 0x01 || cnt > 1)
+        {
+            memcpy(dst, src, len);
+            return len;
+        }
+        p += 6;
+
+        // cnt > 1 not supported?
+        cnt = (*p << 8) | *(p + 1) + 2;
+        memcpy(d, p, cnt);
+        d += cnt;
+        p += cnt;
+
+        // assume pps cnt == 1 too
+        p++;
+        cnt = (*p << 8) | *(p + 1) + 2;
+        memcpy(d, p, cnt);
+        return (int) (d + cnt - dst);
+    }
+
     BOOL SetInputMPEG2(void)
     {
         memset(&m_mp2vi, 0, sizeof(m_mp2vi));
@@ -216,9 +244,20 @@ public:
         memcpy(&m_mp2vi.hdr.bmiHeader, m_bih, sizeof(BITMAPINFOHEADER));
         m_mp2vi.hdr.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
 
+        /* extradata */
+        int extra = m_bih->biSize - sizeof(BITMAPINFOHEADER);
+        int size = sizeof(MPEG2VIDEOINFO);
+        if (extra > 0)
+        {
+            m_mp2vi.dwFlags = AMMPEG2_DVDLine21Field2; /* uh? */
+            m_mp2vi.cbSequenceHeader = avc_quant((BYTE *)(m_bih) + sizeof(BITMAPINFOHEADER), (BYTE *)(&m_mp2vi.dwSequenceHeader[0]), extra);
+            size += m_mp2vi.cbSequenceHeader - 4;
+        }
+
         m_pOurType.formattype = FORMAT_MPEG2Video;
         m_pOurType.pbFormat = (BYTE *) &m_mp2vi;
-        m_pOurType.cbFormat = sizeof(MPEG2VIDEOINFO);
+        m_pOurType.cbFormat = size;
+
         return TRUE;
     }
 
