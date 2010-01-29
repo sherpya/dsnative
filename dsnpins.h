@@ -35,7 +35,7 @@ class CSenderFilter: public CBaseFilter
 {
 public:
     CSenderFilter::CSenderFilter();
-    CSenderFilter::~CSenderFilter() { m_pin->Release(); delete m_pin; }
+    CSenderFilter::~CSenderFilter() { delete m_pin; }
     int GetPinCount() { return 1; }
     CBasePin *GetPin(int n) { return m_pin; }
 
@@ -68,7 +68,7 @@ class CRenderFilter: public CBaseFilter
 {
 public:
     CRenderFilter::CRenderFilter();
-    CRenderFilter::~CRenderFilter() { m_pin->Release(); delete m_pin; }
+    CRenderFilter::~CRenderFilter() { delete m_pin; }
     int GetPinCount() { return 1; }
     CBasePin *GetPin(int n) { return m_pin; }
 
