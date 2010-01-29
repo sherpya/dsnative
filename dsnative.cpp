@@ -19,6 +19,8 @@
 
 #include "stdafx.h"
 
+typedef unsigned __int64 uint64_t;
+
 class DSVideoCodec
 {
 public:
@@ -340,16 +342,20 @@ public:
         return TRUE;
     }
 
-    BOOL Decode(const BYTE *src, int size, int is_keyframe, BYTE *pImage)
+    BOOL Decode(const BYTE *src, int size, REFERENCE_TIME pts, int is_keyframe, BYTE *pImage)
     {
         IMediaSample* sample = NULL;
+        REFERENCE_TIME stoptime;
+        stoptime = pts + 1;
         BYTE *ptr;
 
         m_res = m_pAll->GetBuffer(&sample, 0, 0, 0);
         if (m_res != S_OK) return FALSE;
+
         m_res = sample->SetActualDataLength(size);
         m_res = sample->GetPointer(&ptr);
         memcpy(ptr, src, size);
+        m_res = sample->SetTime(&pts, &stoptime);
         m_res = sample->SetSyncPoint(is_keyframe);
         m_res = sample->SetPreroll(pImage ? 0 : 1);
         m_res = sample->SetDiscontinuity(m_discontinuity);
@@ -506,9 +512,9 @@ extern "C" void WINAPI DSCloseVideoCodec(DSVideoCodec *vcodec)
     delete vcodec;
 }
 
-extern "C" BOOL WINAPI DSVideoDecode(DSVideoCodec *vcodec, const BYTE *src, int size, int is_keyframe, BYTE *pImage)
+extern "C" BOOL WINAPI DSVideoDecode(DSVideoCodec *vcodec, const BYTE *src, int size, uint64_t pts, int is_keyframe, BYTE *pImage)
 {
-    return vcodec->Decode(src, size, is_keyframe, pImage);
+    return vcodec->Decode(src, size, pts, is_keyframe, pImage);
 }
 
 extern "C" BOOL WINAPI DSShowPropertyPage(DSVideoCodec *codec)
