@@ -126,7 +126,11 @@ public:
         m_vi.bmiHeader.biCompression = m_vi2.bmiHeader.biCompression = m_outfmt;
 
         m_vi.bmiHeader.biPlanes = 1;
-        SetOutputFormat(&m_vi.bmiHeader.biBitCount, &m_vi.bmiHeader.biPlanes);
+
+        /* Check if we support the desidered output format */
+        if (!SetOutputFormat(&m_vi.bmiHeader.biBitCount, &m_vi.bmiHeader.biPlanes))
+            return FALSE;
+
         m_vi2.bmiHeader.biBitCount = m_vi.bmiHeader.biBitCount;
         m_vi2.bmiHeader.biPlanes = m_vi.bmiHeader.biPlanes;
 
@@ -400,7 +404,7 @@ public:
         return (!FAILED(m_res));
     }
 
-    void SetOutputFormat(WORD *biBitCount, WORD *biPlanes)
+    BOOL SetOutputFormat(WORD *biBitCount, WORD *biPlanes)
     {
         switch (m_outfmt)
         {
@@ -408,38 +412,44 @@ public:
             case mmioFOURCC('Y', 'U', 'Y', '2'):
                 m_pDestType.subtype = MEDIASUBTYPE_YUY2;
                 *biBitCount = 16;
-                break;
+                return TRUE;
             case mmioFOURCC('U', 'Y', 'V', 'Y'):
                 m_pDestType.subtype = MEDIASUBTYPE_UYVY;
                 *biBitCount = 16;
-                break;
+                return TRUE;
             case mmioFOURCC('Y', 'V', '1', '2'):
                 m_pDestType.subtype = MEDIASUBTYPE_YV12;
                 *biBitCount = 12;
                 *biPlanes = 3;
-                break;
+                return TRUE;
             case mmioFOURCC('I', 'Y', 'U', 'V'):
                 m_pDestType.subtype = MEDIASUBTYPE_IYUV;
                 *biBitCount = 12;
                 *biPlanes = 3;
-                break;
+                return TRUE;
             case mmioFOURCC('Y', 'V', 'U', '9'):
                 m_pDestType.subtype = MEDIASUBTYPE_YVU9;
                 *biBitCount = 9;
-                break;
-            default: // RGB // FIXME: 'R', 'G', 'B', bits ??
-                {
-                    unsigned int bits = m_outfmt & 0xff;
-                    *biBitCount = bits;
-                    switch (bits)
-                    {
-                        case 15: m_pDestType.subtype = MEDIASUBTYPE_RGB555; break;
-                        case 16: m_pDestType.subtype = MEDIASUBTYPE_RGB565; break;
-                        case 24: m_pDestType.subtype = MEDIASUBTYPE_RGB24; break;
-                        case 32: m_pDestType.subtype = MEDIASUBTYPE_RGB32; break;
-                    }
-                }
+                return TRUE;
         }
+
+        /* RGB */
+        unsigned int bits = m_outfmt & 0xff;
+        unsigned int check = m_outfmt ^ bits;
+
+        if (check == mmioFOURCC(0, 'B', 'G', 'R'))
+        {
+            *biBitCount = bits;
+            switch (bits)
+            {
+                case 15: m_pDestType.subtype = MEDIASUBTYPE_RGB555; return TRUE;
+                case 16: m_pDestType.subtype = MEDIASUBTYPE_RGB565; return TRUE;
+                case 24: m_pDestType.subtype = MEDIASUBTYPE_RGB24; return TRUE;
+                case 32: m_pDestType.subtype = MEDIASUBTYPE_RGB32; return TRUE;
+            }
+        }
+        fprintf(stderr, "Format not supported 0x%08x\n", m_outfmt);
+        return FALSE;
     }
 
 private:
