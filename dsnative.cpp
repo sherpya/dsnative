@@ -369,6 +369,16 @@ public:
         return TRUE;
     }
 
+    BOOL Resync(void)
+    {
+        /* often E_NOTIMPL */
+        m_pInputPin->BeginFlush();
+        m_pInputPin->EndFlush();
+        m_res = m_pInputPin->NewSegment(0, 0, 1);
+        m_discontinuity = 1;
+        return (m_res == S_OK);
+    }
+
     BOOL ShowPropertyPage(void)
     {
         if (!m_pFilter) return FALSE;
@@ -515,6 +525,11 @@ extern "C" void WINAPI DSCloseVideoCodec(DSVideoCodec *vcodec)
 extern "C" BOOL WINAPI DSVideoDecode(DSVideoCodec *vcodec, const BYTE *src, int size, uint64_t pts, int is_keyframe, BYTE *pImage)
 {
     return vcodec->Decode(src, size, pts, is_keyframe, pImage);
+}
+
+extern "C" BOOL WINAPI DSVideoResync(DSVideoCodec *vcodec)
+{
+    return vcodec->Resync();
 }
 
 extern "C" BOOL WINAPI DSShowPropertyPage(DSVideoCodec *codec)

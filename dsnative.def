@@ -3,4 +3,5 @@ EXPORTS
 DSOpenVideoCodec
 DSCloseVideoCodec
 DSVideoDecode
+DSVideoResync
 DSShowPropertyPage
