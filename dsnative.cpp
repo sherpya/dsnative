@@ -33,30 +33,34 @@ public:
     DSVideoCodec::~DSVideoCodec()
     {
         ReleaseGraph();
+        if (m_hDll)
+            FreeLibrary(m_hDll);
     }
 
     void ReleaseGraph(void)
     {
-        if (m_pMC)
-            m_pMC->Stop();
-
         if (m_pGraph)
         {
+            m_pMC->Stop();
             RemoveFromRot(m_dwRegister);
 
-            m_pGraph->Disconnect(m_pOurInput);
-            m_pGraph->Disconnect(m_pOurOutput);
+            /* binary codec */
+            m_pAll->Release();
+            m_pImp->Release();
             m_pGraph->Disconnect(m_pInputPin);
             m_pGraph->Disconnect(m_pOutputPin);
-
-            m_pGraph->RemoveFilter(m_pSFilter);
-            m_pGraph->RemoveFilter(m_pRFilter);
-            m_pGraph->RemoveFilter(m_pFilter);
-
-            m_pImp->Release();
             m_pInputPin->Release();
             m_pOutputPin->Release();
+            m_pGraph->RemoveFilter(m_pFilter);
+            m_pFilter->Release();
 
+            /* our stuff */
+            m_pGraph->Disconnect(m_pOurInput);
+            m_pGraph->Disconnect(m_pOurOutput);
+            m_pGraph->RemoveFilter(m_pSFilter);
+            m_pGraph->RemoveFilter(m_pRFilter);
+
+            m_pMC->Release();
             m_pGraph->Release();
         }
     }
@@ -73,18 +77,18 @@ public:
 
         IClassFactory *factory;
         m_res = pDllGetClassObject(m_guid, IID_IClassFactory, (LPVOID *) &factory);
-        if (FAILED(m_res))return FALSE;
+        if (m_res != S_OK) return FALSE;
 
         IUnknown* object;
         m_res = factory->CreateInstance(NULL, IID_IUnknown, (LPVOID *) &object);
         factory->Release();
 
-        if (FAILED(m_res)) return FALSE;
+        if (m_res != S_OK) return FALSE;
 
         m_res = object->QueryInterface(IID_IBaseFilter, (LPVOID *) &m_pFilter);
         object->Release();
 
-        return (!FAILED(m_res));
+        return (m_res == S_OK);
     }
 
     BOOL CheckMediaTypes(IPin *pin)
@@ -226,15 +230,9 @@ public:
             pin->QueryPinInfo(&pInfo);
             wprintf(L"Pin: %s - %s\n", pInfo.achName, (pInfo.dir == PINDIR_INPUT) ? L"Input" : L"Output");
             if (pInfo.dir == PINDIR_INPUT)
-            {
                 m_pInputPin = pin;
-                m_pInputPin->AddRef();
-            }
             else if (pInfo.dir == PINDIR_OUTPUT)
-            {
                 m_pOutputPin = pin;
-                m_pOutputPin->AddRef();
-            }
             pin->Release();
         }
 
