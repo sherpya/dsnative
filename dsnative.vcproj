@@ -135,7 +135,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="strmiids.lib comctl32.lib"
+				AdditionalDependencies="strmiids.lib strmbase.lib comctl32.lib winmm.lib"
 				LinkIncremental="1"
 				ModuleDefinitionFile="dsnative.def"
 				GenerateDebugInformation="true"
