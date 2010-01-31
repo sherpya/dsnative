@@ -19,8 +19,6 @@
 
 #include "stdafx.h"
 
-typedef unsigned __int64 uint64_t;
-
 class DSVideoCodec
 {
 public:
@@ -384,11 +382,11 @@ public:
         return TRUE;
     }
 
-    BOOL Decode(const BYTE *src, int size, REFERENCE_TIME pts, int is_keyframe, BYTE *pImage)
+    BOOL Decode(const BYTE *src, int size, double pts, double *newpts, BYTE *pImage)
     {
         IMediaSample* sample = NULL;
-        REFERENCE_TIME stoptime;
-        stoptime = pts + 1;
+        REFERENCE_TIME start = (REFERENCE_TIME) (pts * 1E9);
+        REFERENCE_TIME stoptime = start + 1;
         BYTE *ptr;
 
         m_res = m_pAll->GetBuffer(&sample, 0, 0, 0);
@@ -397,8 +395,8 @@ public:
         m_res = sample->SetActualDataLength(size);
         m_res = sample->GetPointer(&ptr);
         memcpy(ptr, src, size);
-        m_res = sample->SetTime(&pts, &stoptime);
-        m_res = sample->SetSyncPoint(is_keyframe);
+        m_res = sample->SetTime(&start, &stoptime);
+        m_res = sample->SetSyncPoint(0);
         m_res = sample->SetPreroll(pImage ? 0 : 1);
         m_res = sample->SetDiscontinuity(m_discontinuity);
         m_discontinuity = 0;
@@ -406,8 +404,9 @@ public:
         m_pOurOutput->SetPointer(pImage);
         //m_res = m_pOurOutput->Receive(sample); // for debug it displays noise
         m_res = m_pImp->Receive(sample);
-
         sample->Release();
+
+        *newpts = (double) (m_pOurOutput->GetPTS() / 1E9);
         return TRUE;
     }
 
@@ -565,14 +564,14 @@ extern "C" void WINAPI DSCloseVideoCodec(DSVideoCodec *vcodec)
     delete vcodec;
 }
 
-extern "C" BOOL WINAPI DSVideoDecode(DSVideoCodec *vcodec, const BYTE *src, int size, uint64_t pts, int is_keyframe, BYTE *pImage)
+extern "C" BOOL WINAPI DSVideoDecode(DSVideoCodec *vcodec, const BYTE *src, int size, double pts, double *newpts, BYTE *pImage)
 {
-    return vcodec->Decode(src, size, pts, is_keyframe, pImage);
+    return vcodec->Decode(src, size, pts, newpts, pImage);
 }
 
-extern "C" BOOL WINAPI DSVideoResync(DSVideoCodec *vcodec, uint64_t pts)
+extern "C" BOOL WINAPI DSVideoResync(DSVideoCodec *vcodec, double pts)
 {
-    return vcodec->Resync(pts);
+    return vcodec->Resync((REFERENCE_TIME) (pts * 1E9));
 }
 
 extern "C" BOOL WINAPI DSShowPropertyPage(DSVideoCodec *codec)

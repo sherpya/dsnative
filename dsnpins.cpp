@@ -40,7 +40,7 @@ CSenderFilter::CSenderFilter() : CBaseFilter(NAME("CSenderFilter"), NULL, &m_csF
     m_pin = new CSenderPin(&m_hr, this, &m_csFilter);
 }
 
-CRenderPin::CRenderPin(HRESULT *phr, CRenderFilter *pFilter, CCritSec *pLock) : m_gPtr(NULL), CBaseInputPin(NAME("CRenderPin"), pFilter, pLock, phr, L"Render")
+CRenderPin::CRenderPin(HRESULT *phr, CRenderFilter *pFilter, CCritSec *pLock) : m_gPtr(NULL), m_refstart(-1LL << 63), CBaseInputPin(NAME("CRenderPin"), pFilter, pLock, phr, L"Render")
 {
     fprintf(stderr, "CRenderPin::CRenderPin\n");
 }
@@ -48,10 +48,12 @@ CRenderPin::CRenderPin(HRESULT *phr, CRenderFilter *pFilter, CCritSec *pLock) : 
 HRESULT CRenderPin::Receive(IMediaSample *pSample)
 {
     BYTE *ptr;
+    REFERENCE_TIME end;
     assert(m_gPtr);
     pSample->GetPointer(&ptr);
     long len = pSample->GetActualDataLength();
     memcpy(m_gPtr, ptr, len);
+    pSample->GetTime(&m_refstart, &end);
     return S_OK;
 }
 

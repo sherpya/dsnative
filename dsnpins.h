@@ -54,6 +54,7 @@ public:
     CRenderPin::CRenderPin(HRESULT *phr, CRenderFilter *pFilter, CCritSec *pLock);
     HRESULT CheckMediaType(const CMediaType *) { return S_OK; };
     HRESULT STDMETHODCALLTYPE Receive(IMediaSample *pSample);
+    REFERENCE_TIME GetPTS(void) { return m_refstart; }
 
     HRESULT STDMETHODCALLTYPE BeginFlush(void) { return E_NOTIMPL; }
     HRESULT STDMETHODCALLTYPE EndFlush(void) { return E_NOTIMPL; }
@@ -61,6 +62,7 @@ public:
     void SetPointer(BYTE *ptr) { m_gPtr = ptr; }
 
 private:
+    REFERENCE_TIME m_refstart;
     BYTE *m_gPtr;
 };
 
