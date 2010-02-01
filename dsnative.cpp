@@ -43,23 +43,19 @@ public:
         {
             m_pMC->Stop();
             RemoveFromRot(m_dwRegister);
+        }
 
-            /* binary codec */
-            m_pAll->Release();
-            m_pImp->Release();
-            m_pGraph->Disconnect(m_pInputPin);
-            m_pGraph->Disconnect(m_pOutputPin);
-            m_pInputPin->Release();
-            m_pOutputPin->Release();
-            m_pGraph->RemoveFilter(m_pFilter);
-            m_pFilter->Release();
+        /* binary codec */
+        m_pAll->Release();
+        m_pImp->Release();
+        m_pInputPin->Disconnect();
+        m_pOutputPin->Disconnect();
+        m_pInputPin->Release();
+        m_pOutputPin->Release();
+        m_pFilter->Release();
 
-            /* our stuff */
-            m_pGraph->Disconnect(m_pOurInput);
-            m_pGraph->Disconnect(m_pOurOutput);
-            m_pGraph->RemoveFilter(m_pSFilter);
-            m_pGraph->RemoveFilter(m_pRFilter);
-
+        if (m_pGraph)
+        {
             m_pMC->Release();
             m_pGraph->Release();
         }
@@ -304,7 +300,7 @@ public:
         return TRUE;
     }
 
-    BOOL CreateGraph(void)
+    BOOL CreateGraph(bool buildgraph=false)
     {
         this->EnumPins();
         this->SetInputType();
@@ -316,29 +312,27 @@ public:
         m_pRFilter = new CRenderFilter();
         m_pOurOutput = (CRenderPin *) m_pRFilter->GetPin(0);
 
-        m_res = CoCreateInstance(CLSID_FilterGraph, NULL, CLSCTX_INPROC_SERVER, IID_IGraphBuilder, (void **) &m_pGraph);
-        m_res = DSVideoCodec::AddToRot(m_pGraph, &m_dwRegister);
-        m_pGraph->QueryInterface(IID_IMediaControl, (void **) &m_pMC);    
+        if (buildgraph)
+        {
+            m_res = CoCreateInstance(CLSID_FilterGraph, NULL, CLSCTX_INPROC_SERVER, IID_IGraphBuilder, (void **) &m_pGraph);
+            m_res = DSVideoCodec::AddToRot(m_pGraph, &m_dwRegister);
+            m_pGraph->QueryInterface(IID_IMediaControl, (void **) &m_pMC);    
 
-        //HANDLE hFile = CreateFile("out.log", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-        //DWORD r;
-        //const char bom[] = "\xff\xfe";
-        //WriteFile(hFile, bom, 2, &r, NULL);
-        //m_res = pGraph->SetLogFile((DWORD_PTR) hFile);
+            m_res = m_pGraph->AddFilter(m_pSFilter, L"DS Sender");
+            m_res = m_pGraph->AddFilter(m_pRFilter, L"DS Render");
+            m_res = m_pGraph->AddFilter(m_pFilter, L"Binary Codec");
+            // Connect our output pin to codec input pin otherwise QueryAccept on the codec output pin will fail
+            m_res = m_pGraph->ConnectDirect(m_pOurInput, m_pInputPin, &m_pOurType); 
+        }
+        else
+            m_res = m_pInputPin->ReceiveConnection(m_pOurInput, &m_pOurType); /* same of above */            
 
-        m_res = m_pGraph->SetLogFile((DWORD_PTR) GetStdHandle(STD_OUTPUT_HANDLE));
-        
-        m_res = m_pGraph->AddFilter(m_pSFilter, L"DS Sender");
-        m_res = m_pGraph->AddFilter(m_pRFilter, L"DS Render");
-        m_res = m_pGraph->AddFilter(m_pFilter, L"Binary Codec");
-        
-        // Connect our output pin to codec input pin otherwise QueryAccept on the codec output pin will fail
-        //m_res = m_pInputPin->ReceiveConnection(m_pOurInput, &m_pOurType); 
-        m_res = m_pGraph->ConnectDirect(m_pOurInput, m_pInputPin, &m_pOurType);
         SetOutputType();
 
-        m_res = m_pGraph->ConnectDirect(m_pOurOutput, m_pOutputPin, &m_pDestType);
-        m_res = m_pGraph->ConnectDirect(m_pOutputPin, m_pOurOutput, &m_pDestType);
+        if (buildgraph)
+            m_res = m_pGraph->ConnectDirect(m_pOurOutput, m_pOutputPin, &m_pDestType);
+        else
+            m_res = m_pOutputPin->ReceiveConnection(m_pOurOutput, &m_pDestType);
 
         return TRUE;
     }
@@ -378,7 +372,10 @@ public:
     BOOL StartGraph(void)
     {
         SetupAllocator();
-        m_pMC->Run();
+        if (m_pMC)
+            m_pMC->Run();
+        else
+            m_pFilter->Run(0);
         return TRUE;
     }
 
@@ -586,9 +583,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved)
         case DLL_PROCESS_ATTACH:
         {
             DisableThreadLibraryCalls(hModule);
-            BOOL result = (OleInitialize(NULL) == S_OK);
-            DbgSetModuleLevel(0xffffffff, LOG_TRACE);
-            return result;
+            return (OleInitialize(NULL) == S_OK);
         }
         case DLL_THREAD_ATTACH:
         case DLL_THREAD_DETACH:
