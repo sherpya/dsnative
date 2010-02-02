@@ -25,7 +25,7 @@ public:
     DSVideoCodec::DSVideoCodec(const char *filename, const GUID guid, BITMAPINFOHEADER *bih, unsigned int outfmt) :
       m_guid(guid), m_bih(bih), m_hDll(NULL), m_outfmt(outfmt), m_discontinuity(1), m_pFilter(NULL),
       m_pInputPin(NULL), m_pOutputPin(NULL), m_pOurInput(NULL), m_pOurOutput(NULL),
-      m_pImp(NULL), m_pSFilter(NULL), m_pRFilter(NULL), m_pGraph(NULL), m_pMC(NULL)
+      m_pImp(NULL), m_pAll(NULL), m_pSFilter(NULL), m_pRFilter(NULL), m_pGraph(NULL), m_pMC(NULL)
     {
         strncpy(m_fname, filename, MAX_PATH);
     }
@@ -39,26 +39,20 @@ public:
 
     void ReleaseGraph(void)
     {
-        if (m_pGraph)
-        {
-            m_pMC->Stop();
-            RemoveFromRot(m_dwRegister);
-        }
+        if (m_pMC) m_pMC->Stop();
+        if (m_pGraph) RemoveFromRot(m_dwRegister);
 
         /* binary codec */
-        m_pAll->Release();
-        m_pImp->Release();
-        m_pInputPin->Disconnect();
-        m_pOutputPin->Disconnect();
-        m_pInputPin->Release();
-        m_pOutputPin->Release();
-        m_pFilter->Release();
+        if (m_pAll) m_pAll->Release();
+        if (m_pImp) m_pImp->Release();
+        if (m_pInputPin) m_pInputPin->Disconnect();
+        if (m_pOutputPin) m_pOutputPin->Disconnect();
+        if (m_pInputPin) m_pInputPin->Release();
+        if (m_pOutputPin) m_pOutputPin->Release();
+        if (m_pFilter) m_pFilter->Release();
 
-        if (m_pGraph)
-        {
-            m_pMC->Release();
-            m_pGraph->Release();
-        }
+        if (m_pMC) m_pMC->Release();
+        if (m_pGraph) m_pGraph->Release();
     }
 
     BOOL LoadLibrary(void)
@@ -105,7 +99,7 @@ public:
         return TRUE;
     }
 
-    BOOL SetOutputType(void)
+    dsnerror_t SetOutputType(void)
     {
         m_pDestType.majortype = MEDIATYPE_Video;
         m_pDestType.bFixedSizeSamples = TRUE;
@@ -125,7 +119,7 @@ public:
 
         /* Check if we support the desidered output format */
         if (!SetOutputFormat(&m_vi.bmiHeader.biBitCount, &m_vi.bmiHeader.biPlanes))
-            return FALSE;
+            return DSN_OUTPUT_NOTSUPPORTED;
 
         m_vi2.bmiHeader.biBitCount = m_vi.bmiHeader.biBitCount;
         m_vi2.bmiHeader.biPlanes = m_vi.bmiHeader.biPlanes;
@@ -153,10 +147,10 @@ public:
             m_res = m_pOutputPin->QueryAccept(&m_pDestType);
         }
 
-        return (m_res == S_OK);
+        return (m_res == S_OK) ? DSN_OK : DSN_OUTPUT_NOTACCEPTED;
     }
 
-    BOOL SetInputType(void)
+    void SetInputType(void)
     {
         m_pOurType.majortype = MEDIATYPE_Video;
         m_pOurType.subtype = MEDIATYPE_Video;
@@ -178,12 +172,14 @@ public:
             case mmioFOURCC('d', 'a', 'v', 'c'):
             case mmioFOURCC('D', 'A', 'V', 'C'):
             case mmioFOURCC('V', 'S', 'S', 'H'):
-                return SetInputMPEG2();
+                SetInputMPEG2();
+                break;
+            default:
+                SetInputVideoInfo();
         }
-        return SetInputVideoInfo();
     }
 
-    BOOL SetInputVideoInfo(void)
+    void SetInputVideoInfo(void)
     {
         memset(&m_vi, 0, sizeof(m_vi));
         memcpy(&m_vi.bmiHeader, m_bih, m_bih->biSize);
@@ -195,7 +191,6 @@ public:
         m_pOurType.formattype = FORMAT_VideoInfo;
         m_pOurType.pbFormat = (BYTE *) &m_vi;
         m_pOurType.cbFormat = sizeof(VIDEOINFOHEADER);
-        return TRUE;
     }
 
     DWORD avc_quant(BYTE *src, BYTE *dst, int len)
@@ -226,7 +221,7 @@ public:
         return (int) (d + cnt - dst);
     }
 
-    BOOL SetInputMPEG2(void)
+    void SetInputMPEG2(void)
     {
         memset(&m_mp2vi, 0, sizeof(m_mp2vi));
         m_mp2vi.hdr.rcSource.left = m_mp2vi.hdr.rcSource.top = 0;
@@ -245,7 +240,7 @@ public:
         {
             BYTE *extradata = (BYTE *) m_bih + sizeof(BITMAPINFOHEADER) + 4;
             m_mp2vi.dwFlags = (*extradata & 0x3) + 1;
-            printf("NALU length field size %d\n", m_mp2vi.dwFlags);
+            /* printf("NALU length field size %d\n", m_mp2vi.dwFlags); */
             m_mp2vi.cbSequenceHeader = avc_quant((BYTE *)(m_bih) + sizeof(BITMAPINFOHEADER), (BYTE *)(&m_mp2vi.dwSequenceHeader[0]), extra);
             // The '4' is from the allocated space of dwSequenceHeader
             size += m_mp2vi.cbSequenceHeader - 4;
@@ -254,14 +249,14 @@ public:
         m_pOurType.formattype = FORMAT_MPEG2Video;
         m_pOurType.pbFormat = (BYTE *) &m_mp2vi;
         m_pOurType.cbFormat = size;
-
-        return TRUE;
     }
 
     BOOL EnumPins(void)
     {
         IEnumPins *enumpins;
-        m_res = m_pFilter->EnumPins(&enumpins);
+        if (m_pFilter->EnumPins(&enumpins) != S_OK)
+            return FALSE;
+
         enumpins->Reset();
 
         IPin *pin;
@@ -270,7 +265,7 @@ public:
         while ((m_res = enumpins->Next(1, &pin, NULL)) == S_OK)
         {
             pin->QueryPinInfo(&pInfo);
-            wprintf(L"Pin: %s - %s\n", pInfo.achName, (pInfo.dir == PINDIR_INPUT) ? L"Input" : L"Output");
+            /* wprintf(L"Pin: %s - %s\n", pInfo.achName, (pInfo.dir == PINDIR_INPUT) ? L"Input" : L"Output"); */
             if (pInfo.dir == PINDIR_INPUT)
                 m_pInputPin = pin;
             else if (pInfo.dir == PINDIR_OUTPUT)
@@ -279,13 +274,18 @@ public:
         }
 
         enumpins->Release();
-        m_res = m_pInputPin->QueryInterface(IID_IMemInputPin, (LPVOID *) &m_pImp);
+        if (!(m_pInputPin && m_pInputPin))
+            return FALSE;
+
+        if (m_pInputPin->QueryInterface(IID_IMemInputPin, (LPVOID *) &m_pImp) != S_OK)
+            return FALSE;
+
         return TRUE;
     }
 
-    BOOL SetupAllocator(void)
+    dsnerror_t SetupAllocator(void)
     {
-        m_res = m_pImp->GetAllocator(&m_pAll);
+        DSN_CHECK(m_pImp->GetAllocator(&m_pAll), DSN_FAIL_ALLOCATOR);
         ALLOCATOR_PROPERTIES props, props1;
 
         props.cBuffers = 1;
@@ -293,19 +293,20 @@ public:
 	    props.cbAlign = 1;
 	    props.cbPrefix = 0;
 
-        m_res = m_pAll->SetProperties(&props, &props1);
-        m_res = m_pImp->NotifyAllocator(m_pAll, FALSE);
-
-        m_res = m_pAll->Commit();
-        return TRUE;
+        DSN_CHECK(m_pAll->SetProperties(&props, &props1), DSN_FAIL_ALLOCATOR);
+        DSN_CHECK(m_pImp->NotifyAllocator(m_pAll, FALSE), DSN_FAIL_ALLOCATOR);
+        DSN_CHECK(m_pAll->Commit(), DSN_FAIL_ALLOCATOR);
+        return DSN_OK;
     }
 
-    BOOL CreateGraph(bool buildgraph=false)
+    dsnerror_t CreateGraph(bool buildgraph=false)
     {
-        this->EnumPins();
-        this->SetInputType();
+        if (!EnumPins())
+            return DSN_FAIL_ENUM;
 
-        m_res = m_pInputPin->QueryAccept(&m_pOurType);
+        SetInputType();
+
+        DSN_CHECK(m_pInputPin->QueryAccept(&m_pOurType), DSN_INPUT_NOTACCEPTED);
 
         m_pSFilter = new CSenderFilter();
         m_pOurInput = (CSenderPin *) m_pSFilter->GetPin(0);
@@ -314,27 +315,28 @@ public:
 
         if (buildgraph)
         {
-            m_res = CoCreateInstance(CLSID_FilterGraph, NULL, CLSCTX_INPROC_SERVER, IID_IGraphBuilder, (void **) &m_pGraph);
-            m_res = DSVideoCodec::AddToRot(m_pGraph, &m_dwRegister);
-            m_pGraph->QueryInterface(IID_IMediaControl, (void **) &m_pMC);    
+            DSN_CHECK(CoCreateInstance(CLSID_FilterGraph, NULL, CLSCTX_INPROC_SERVER, IID_IGraphBuilder, (void **) &m_pGraph), DSN_FAIL_GRAPH);
+            DSN_CHECK(DSVideoCodec::AddToRot(m_pGraph, &m_dwRegister), DSN_FAIL_GRAPH);
+            DSN_CHECK(m_pGraph->QueryInterface(IID_IMediaControl, (void **) &m_pMC), DSN_FAIL_GRAPH);
 
-            m_res = m_pGraph->AddFilter(m_pSFilter, L"DS Sender");
-            m_res = m_pGraph->AddFilter(m_pRFilter, L"DS Render");
-            m_res = m_pGraph->AddFilter(m_pFilter, L"Binary Codec");
+            DSN_CHECK(m_pGraph->AddFilter(m_pSFilter, L"DS Sender"), DSN_FAIL_GRAPH);
+            DSN_CHECK(m_pGraph->AddFilter(m_pRFilter, L"DS Render"), DSN_FAIL_GRAPH);
+            DSN_CHECK(m_pGraph->AddFilter(m_pFilter, L"Binary Codec"), DSN_FAIL_GRAPH);
             // Connect our output pin to codec input pin otherwise QueryAccept on the codec output pin will fail
-            m_res = m_pGraph->ConnectDirect(m_pOurInput, m_pInputPin, &m_pOurType); 
+            DSN_CHECK(m_pGraph->ConnectDirect(m_pOurInput, m_pInputPin, &m_pOurType), DSN_INPUT_CONNFAILED);
         }
         else
-            m_res = m_pInputPin->ReceiveConnection(m_pOurInput, &m_pOurType); /* same of above */            
+             /* same of above */
+            DSN_CHECK(m_pInputPin->ReceiveConnection(m_pOurInput, &m_pOurType), DSN_INPUT_CONNFAILED);
 
         SetOutputType();
 
         if (buildgraph)
-            m_res = m_pGraph->ConnectDirect(m_pOurOutput, m_pOutputPin, &m_pDestType);
+            DSN_CHECK(m_pGraph->ConnectDirect(m_pOurOutput, m_pOutputPin, &m_pDestType), DSN_OUTPUT_CONNFAILED);
         else
-            m_res = m_pOutputPin->ReceiveConnection(m_pOurOutput, &m_pDestType);
+            DSN_CHECK(m_pOutputPin->ReceiveConnection(m_pOurOutput, &m_pDestType), DSN_OUTPUT_CONNFAILED);
 
-        return TRUE;
+        return DSN_OK;
     }
 
     static HRESULT AddToRot(IUnknown *pUnkGraph, DWORD *pdwRegister) 
@@ -379,39 +381,37 @@ public:
         return TRUE;
     }
 
-    BOOL Decode(const BYTE *src, int size, double pts, double *newpts, BYTE *pImage)
+    dsnerror_t Decode(const BYTE *src, int size, double pts, double *newpts, BYTE *pImage)
     {
         IMediaSample* sample = NULL;
         REFERENCE_TIME start = (REFERENCE_TIME) (pts * 1E9);
         REFERENCE_TIME stoptime = start + 1;
         BYTE *ptr;
 
-        m_res = m_pAll->GetBuffer(&sample, 0, 0, 0);
-        if (m_res != S_OK) return FALSE;
+        DSN_CHECK(m_pAll->GetBuffer(&sample, 0, 0, 0), DSN_FAIL_DECODESAMPLE);
 
-        m_res = sample->SetActualDataLength(size);
-        m_res = sample->GetPointer(&ptr);
+        DSN_CHECK(sample->SetActualDataLength(size), DSN_FAIL_DECODESAMPLE);
+        DSN_CHECK(sample->GetPointer(&ptr), DSN_FAIL_DECODESAMPLE);
         memcpy(ptr, src, size);
-        m_res = sample->SetTime(&start, &stoptime);
-        m_res = sample->SetSyncPoint(0);
-        m_res = sample->SetPreroll(pImage ? 0 : 1);
-        m_res = sample->SetDiscontinuity(m_discontinuity);
+        DSN_CHECK(sample->SetTime(&start, &stoptime), DSN_FAIL_DECODESAMPLE);
+        DSN_CHECK(sample->SetSyncPoint(0), DSN_FAIL_DECODESAMPLE);
+        DSN_CHECK(sample->SetPreroll(pImage ? 0 : 1), DSN_FAIL_DECODESAMPLE);
+        DSN_CHECK(sample->SetDiscontinuity(m_discontinuity), DSN_FAIL_DECODESAMPLE);
         m_discontinuity = 0;
 
         m_pOurOutput->SetPointer(pImage);
-        //m_res = m_pOurOutput->Receive(sample); // for debug it displays noise
-        m_res = m_pImp->Receive(sample);
+        DSN_CHECK(m_pImp->Receive(sample), DSN_FAIL_RECEIVE);
         sample->Release();
 
         *newpts = (double) (m_pOurOutput->GetPTS() / 1E9);
-        return TRUE;
+        return DSN_OK;
     }
 
-    BOOL Resync(REFERENCE_TIME pts)
+    dsnerror_t Resync(REFERENCE_TIME pts)
     {
         m_res = m_pInputPin->NewSegment(pts, 0, 1);
         m_discontinuity = 1;
-        return (m_res == S_OK);
+        return DSN_OK;
     }
 
     BOOL ShowPropertyPage(void)
@@ -499,7 +499,7 @@ public:
                 case 32: m_pDestType.subtype = MEDIASUBTYPE_RGB32; return TRUE;
             }
         }
-        fprintf(stderr, "Format not supported 0x%08x\n", m_outfmt);
+        /* fprintf(stderr, "Format not supported 0x%08x\n", m_outfmt); */
         return FALSE;
     }
 
@@ -534,21 +534,23 @@ private:
 };
 
 
-extern "C" DSVideoCodec * WINAPI DSOpenVideoCodec(const char *dll, const GUID guid, BITMAPINFOHEADER* bih, unsigned int outfmt)
+extern "C" DSVideoCodec * WINAPI DSOpenVideoCodec(const char *dll, const GUID guid, BITMAPINFOHEADER* bih, unsigned int outfmt, dsnerror_t *err)
 {
     DSVideoCodec *vcodec = new DSVideoCodec(dll, guid, bih, outfmt);
+    dsnerror_t res = DSN_OK;
 
     if (!vcodec->LoadLibrary())
+        res = DSN_LOADLIBRARY;
+    else if (!vcodec->CreateFilter())
+        res = DNS_FAIL_FILTER;
+    else if ((res = vcodec->CreateGraph()) == DSN_OK)
     {
-        fprintf(stderr, "LoadLibrary Failed %d\n", GetLastError());
-        delete vcodec;
-        return NULL;
-    }
-
-    if (vcodec->CreateFilter() && vcodec->CreateGraph() && vcodec->StartGraph())
+        vcodec->StartGraph();
+        if (*err) *err = DSN_OK;
         return vcodec;
-
+    }
     delete vcodec;
+    if (*err) *err = res;
     return NULL;
 }
 
@@ -557,12 +559,12 @@ extern "C" void WINAPI DSCloseVideoCodec(DSVideoCodec *vcodec)
     delete vcodec;
 }
 
-extern "C" BOOL WINAPI DSVideoDecode(DSVideoCodec *vcodec, const BYTE *src, int size, double pts, double *newpts, BYTE *pImage)
+extern "C" dsnerror_t WINAPI DSVideoDecode(DSVideoCodec *vcodec, const BYTE *src, int size, double pts, double *newpts, BYTE *pImage)
 {
     return vcodec->Decode(src, size, pts, newpts, pImage);
 }
 
-extern "C" BOOL WINAPI DSVideoResync(DSVideoCodec *vcodec, double pts)
+extern "C" dsnerror_t WINAPI DSVideoResync(DSVideoCodec *vcodec, double pts)
 {
     return vcodec->Resync((REFERENCE_TIME) (pts * 1E9));
 }
@@ -589,4 +591,3 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved)
     }
     return TRUE;
 }
-

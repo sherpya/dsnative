@@ -21,7 +21,6 @@
 
 CSenderPin::CSenderPin(HRESULT *phr, CSenderFilter *pFilter, CCritSec *pLock) : CBaseOutputPin(NAME("CSenderPin"), pFilter, pLock, phr, L"Sender")
 {
-    fprintf(stderr, "CSenderPin::CSenderPin\n");
 }
 
 HRESULT CSenderPin::DecideBufferSize(IMemAllocator *pAlloc, ALLOCATOR_PROPERTIES *ppropInputRequest)
@@ -36,13 +35,11 @@ HRESULT CSenderPin::DecideBufferSize(IMemAllocator *pAlloc, ALLOCATOR_PROPERTIES
 
 CSenderFilter::CSenderFilter() : CBaseFilter(NAME("CSenderFilter"), NULL, &m_csFilter, GUID_NULL)
 {
-    fprintf(stderr, "CSenderFilter::CSenderFilter\n");
     m_pin = new CSenderPin(&m_hr, this, &m_csFilter);
 }
 
 CRenderPin::CRenderPin(HRESULT *phr, CRenderFilter *pFilter, CCritSec *pLock) : m_gPtr(NULL), m_refstart(-1LL << 63), CBaseInputPin(NAME("CRenderPin"), pFilter, pLock, phr, L"Render")
 {
-    fprintf(stderr, "CRenderPin::CRenderPin\n");
 }
 
 HRESULT CRenderPin::Receive(IMediaSample *pSample)
@@ -58,6 +55,5 @@ HRESULT CRenderPin::Receive(IMediaSample *pSample)
 
 CRenderFilter::CRenderFilter() : CBaseFilter(NAME("CRenderFilter"), NULL, &m_csFilter, GUID_NULL)
 {
-    fprintf(stderr, "CRenderFilter::CRenderFilter\n");
     m_pin = new CRenderPin(&m_hr, this, &m_csFilter);
 }
