@@ -409,10 +409,6 @@ public:
 
     BOOL Resync(REFERENCE_TIME pts)
     {
-        /* It really does something useful? */
-        /* often E_NOTIMPL */
-        //m_pInputPin->BeginFlush();
-        //m_pInputPin->EndFlush();
         m_res = m_pInputPin->NewSegment(pts, 0, 1);
         m_discontinuity = 1;
         return (m_res == S_OK);
