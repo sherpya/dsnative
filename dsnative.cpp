@@ -153,7 +153,7 @@ public:
     BOOL SetInputType(void)
     {
         ULONG cbFormat;
-        //DebugBreak();
+
         m_pOurType.majortype = MEDIATYPE_Video;
         m_pOurType.subtype = MEDIATYPE_Video;
         m_pOurType.subtype.Data1 = m_bih->biCompression;
@@ -303,7 +303,7 @@ public:
         return DSN_OK;
     }
 
-    dsnerror_t CreateGraph(bool buildgraph=true)
+    dsnerror_t CreateGraph(bool buildgraph=false)
     {
         if (!EnumPins())
             return DSN_FAIL_ENUM;
