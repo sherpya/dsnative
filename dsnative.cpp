@@ -33,6 +33,7 @@ public:
     DSVideoCodec::~DSVideoCodec()
     {
         ReleaseGraph();
+        delete m_vinfo;
         if (m_hDll)
             FreeLibrary(m_hDll);
     }
