@@ -33,7 +33,7 @@ public:
     DSVideoCodec::~DSVideoCodec()
     {
         ReleaseGraph();
-        delete m_vinfo;
+        if (m_vinfo) delete m_vinfo;
         if (m_hDll)
             FreeLibrary(m_hDll);
     }
@@ -199,6 +199,7 @@ public:
             return TRUE;
 
         delete m_vinfo;
+        m_vinfo = NULL;
 
         // probe FORMAT_VideoInfo
         cbFormat = sizeof(VIDEOINFOHEADER) + m_bih->biSize;
@@ -221,6 +222,7 @@ public:
             return TRUE;
 
         delete m_vinfo;
+        m_vinfo = NULL;
         return FALSE;
     }
 
