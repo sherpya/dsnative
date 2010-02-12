@@ -23,7 +23,7 @@ class DSVideoCodec
 {
 public:
     DSVideoCodec::DSVideoCodec(const char *filename, const GUID guid, BITMAPINFOHEADER *bih, unsigned int outfmt) :
-      m_guid(guid), m_bih(bih), m_hDll(NULL), m_outfmt(outfmt), m_discontinuity(1), m_pFilter(NULL),
+      m_guid(guid), m_bih(bih), m_hDll(NULL), m_outfmt(outfmt), m_vinfo(NULL), m_discontinuity(1), m_pFilter(NULL),
       m_pInputPin(NULL), m_pOutputPin(NULL), m_pOurInput(NULL), m_pOurOutput(NULL),
       m_pImp(NULL), m_pAll(NULL), m_pSFilter(NULL), m_pRFilter(NULL), m_pGraph(NULL), m_pMC(NULL)
     {
@@ -146,51 +146,81 @@ public:
             m_pDestType.pbFormat = (BYTE *) &m_vi2;
             m_res = m_pOutputPin->QueryAccept(&m_pDestType);
         }
-
         return (m_res == S_OK) ? DSN_OK : DSN_OUTPUT_NOTACCEPTED;
     }
 
-    void SetInputType(void)
+    BOOL SetInputType(void)
     {
+        ULONG cbFormat;
+        //DebugBreak();
         m_pOurType.majortype = MEDIATYPE_Video;
         m_pOurType.subtype = MEDIATYPE_Video;
         m_pOurType.subtype.Data1 = m_bih->biCompression;
-        m_pOurType.formattype = FORMAT_VideoInfo;
         m_pOurType.bFixedSizeSamples = FALSE;
         m_pOurType.bTemporalCompression = TRUE;
-        m_pOurType.lSampleSize = 1; // FIXME: correct ?
+        m_pOurType.lSampleSize = 1;
         m_pOurType.pUnk = NULL;
 
-        switch (m_bih->biCompression)
-        {
-            case mmioFOURCC('H', '2', '6', '4'):
-            case mmioFOURCC('h', '2', '6', '4'):
-            case mmioFOURCC('X', '2', '6', '4'):
-            case mmioFOURCC('x', '2', '6', '4'):
-            case mmioFOURCC('A', 'V', 'C', '1'):
-            case mmioFOURCC('a', 'v', 'c', '1'):
-            case mmioFOURCC('d', 'a', 'v', 'c'):
-            case mmioFOURCC('D', 'A', 'V', 'C'):
-            case mmioFOURCC('V', 'S', 'S', 'H'):
-                SetInputMPEG2();
-                break;
-            default:
-                SetInputVideoInfo();
-        }
-    }
+        // probe FORMAT_MPEG2Video
+        // this is done before FORMAT_VideoInfo because e.g. coreavc will accept anyway the format
+        // but it will decode black frames
 
-    void SetInputVideoInfo(void)
-    {
-        memset(&m_vi, 0, sizeof(m_vi));
-        memcpy(&m_vi.bmiHeader, m_bih, m_bih->biSize);
-        m_vi.rcSource.left = m_vi.rcSource.top = 0;
-        m_vi.rcSource.right = m_bih->biWidth;
-        m_vi.rcSource.bottom = m_bih->biHeight;
-        m_vi.rcTarget = m_vi.rcSource;
+        int extra = m_bih->biSize - sizeof(BITMAPINFOHEADER);
+        // The '4' is from the allocated space of dwSequenceHeader
+        cbFormat = sizeof(MPEG2VIDEOINFO) + extra - 4;
+
+        MPEG2VIDEOINFO *try_mp2vi = (MPEG2VIDEOINFO *) new BYTE[cbFormat];
+        m_vinfo = (BYTE *) try_mp2vi;
+
+        memset(try_mp2vi, 0, cbFormat);
+        try_mp2vi->hdr.rcSource.left = try_mp2vi->hdr.rcSource.top = 0;
+        try_mp2vi->hdr.rcSource.right = m_bih->biWidth;
+        try_mp2vi->hdr.rcSource.bottom = m_bih->biHeight;
+        try_mp2vi->hdr.rcTarget = try_mp2vi->hdr.rcSource;
+        try_mp2vi->hdr.dwPictAspectRatioX = m_bih->biWidth;
+        try_mp2vi->hdr.dwPictAspectRatioY = m_bih->biHeight;
+        memcpy(&try_mp2vi->hdr.bmiHeader, m_bih, sizeof(BITMAPINFOHEADER));
+        try_mp2vi->hdr.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+
+        if (extra > 0)
+        {
+            BYTE *extradata = (BYTE *) m_bih + sizeof(BITMAPINFOHEADER) + 4;
+            try_mp2vi->dwFlags = (*extradata & 0x3) + 1;
+            /* printf("NALU length field size %d\n", m_mp2vi.dwFlags); */
+            try_mp2vi->cbSequenceHeader = avc_quant((BYTE *)(m_bih) + sizeof(BITMAPINFOHEADER), (BYTE *)(&try_mp2vi->dwSequenceHeader[0]), extra);
+        }
+
+        m_pOurType.formattype = FORMAT_MPEG2Video;
+        m_pOurType.pbFormat = m_vinfo;
+        m_pOurType.cbFormat = cbFormat;
+
+        if ((m_res = m_pInputPin->QueryAccept(&m_pOurType)) == S_OK)
+            return TRUE;
+
+        delete m_vinfo;
+
+        // probe FORMAT_VideoInfo
+        cbFormat = sizeof(VIDEOINFOHEADER) + m_bih->biSize;
+        VIDEOINFOHEADER *try_vi = (VIDEOINFOHEADER *) new BYTE[cbFormat];
+        m_vinfo = (BYTE *) try_vi;
+
+        memset(try_vi, 0, cbFormat);
+        memcpy(&try_vi->bmiHeader, m_bih, m_bih->biSize);
+
+        try_vi->rcSource.left = try_vi->rcSource.top = 0;
+        try_vi->rcSource.right = m_bih->biWidth;
+        try_vi->rcSource.bottom = m_bih->biHeight;
+        try_vi->rcTarget = try_vi->rcSource;
 
         m_pOurType.formattype = FORMAT_VideoInfo;
-        m_pOurType.pbFormat = (BYTE *) &m_vi;
-        m_pOurType.cbFormat = sizeof(VIDEOINFOHEADER);
+        m_pOurType.pbFormat = m_vinfo;
+        m_pOurType.cbFormat = cbFormat;
+
+        if ((m_res = m_pInputPin->QueryAccept(&m_pOurType)) == S_OK)
+            return TRUE;
+
+        delete m_vinfo;
+        return FALSE;
     }
 
     DWORD avc_quant(BYTE *src, BYTE *dst, int len)
@@ -221,36 +251,6 @@ public:
         return (int) (d + cnt - dst);
     }
 
-    void SetInputMPEG2(void)
-    {
-        memset(&m_mp2vi, 0, sizeof(m_mp2vi));
-        m_mp2vi.hdr.rcSource.left = m_mp2vi.hdr.rcSource.top = 0;
-        m_mp2vi.hdr.rcSource.right = m_bih->biWidth;
-        m_mp2vi.hdr.rcSource.bottom = m_bih->biHeight;
-        m_mp2vi.hdr.rcTarget = m_mp2vi.hdr.rcSource;
-        m_mp2vi.hdr.dwPictAspectRatioX = m_bih->biWidth;
-        m_mp2vi.hdr.dwPictAspectRatioY = m_bih->biHeight;
-        memcpy(&m_mp2vi.hdr.bmiHeader, m_bih, sizeof(BITMAPINFOHEADER));
-        m_mp2vi.hdr.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-
-        /* extradata */
-        int extra = m_bih->biSize - sizeof(BITMAPINFOHEADER);
-        int size = sizeof(MPEG2VIDEOINFO);
-        if (extra > 0)
-        {
-            BYTE *extradata = (BYTE *) m_bih + sizeof(BITMAPINFOHEADER) + 4;
-            m_mp2vi.dwFlags = (*extradata & 0x3) + 1;
-            /* printf("NALU length field size %d\n", m_mp2vi.dwFlags); */
-            m_mp2vi.cbSequenceHeader = avc_quant((BYTE *)(m_bih) + sizeof(BITMAPINFOHEADER), (BYTE *)(&m_mp2vi.dwSequenceHeader[0]), extra);
-            // The '4' is from the allocated space of dwSequenceHeader
-            size += m_mp2vi.cbSequenceHeader - 4;
-        }
-
-        m_pOurType.formattype = FORMAT_MPEG2Video;
-        m_pOurType.pbFormat = (BYTE *) &m_mp2vi;
-        m_pOurType.cbFormat = size;
-    }
-
     BOOL EnumPins(void)
     {
         IEnumPins *enumpins;
@@ -262,13 +262,16 @@ public:
         IPin *pin;
         PIN_INFO pInfo;
 
+        // FIXME: ffdshow has 2 input pins "In" and "In Text"
+        // there is not way to check mediatype before connection
+        // I think I need a list of pins and then probe for all :(
         while ((m_res = enumpins->Next(1, &pin, NULL)) == S_OK)
         {
             pin->QueryPinInfo(&pInfo);
             /* wprintf(L"Pin: %s - %s\n", pInfo.achName, (pInfo.dir == PINDIR_INPUT) ? L"Input" : L"Output"); */
-            if (pInfo.dir == PINDIR_INPUT)
+            if (!m_pInputPin && (pInfo.dir == PINDIR_INPUT))
                 m_pInputPin = pin;
-            else if (pInfo.dir == PINDIR_OUTPUT)
+            else if (!m_pOutputPin && (pInfo.dir == PINDIR_OUTPUT))
                 m_pOutputPin = pin;
             pin->Release();
         }
@@ -299,14 +302,13 @@ public:
         return DSN_OK;
     }
 
-    dsnerror_t CreateGraph(bool buildgraph=false)
+    dsnerror_t CreateGraph(bool buildgraph=true)
     {
         if (!EnumPins())
             return DSN_FAIL_ENUM;
 
-        SetInputType();
-
-        DSN_CHECK(m_pInputPin->QueryAccept(&m_pOurType), DSN_INPUT_NOTACCEPTED);
+        if (!SetInputType())
+            return DSN_INPUT_NOTACCEPTED;
 
         m_pSFilter = new CSenderFilter();
         m_pOurInput = (CSenderPin *) m_pSFilter->GetPin(0);
@@ -319,6 +321,7 @@ public:
             DSN_CHECK(DSVideoCodec::AddToRot(m_pGraph, &m_dwRegister), DSN_FAIL_GRAPH);
             DSN_CHECK(m_pGraph->QueryInterface(IID_IMediaControl, (void **) &m_pMC), DSN_FAIL_GRAPH);
 
+            m_pGraph->SetLogFile((DWORD_PTR) GetStdHandle(STD_OUTPUT_HANDLE));
             DSN_CHECK(m_pGraph->AddFilter(m_pSFilter, L"DS Sender"), DSN_FAIL_GRAPH);
             DSN_CHECK(m_pGraph->AddFilter(m_pRFilter, L"DS Render"), DSN_FAIL_GRAPH);
             DSN_CHECK(m_pGraph->AddFilter(m_pFilter, L"Binary Codec"), DSN_FAIL_GRAPH);
@@ -528,7 +531,7 @@ private:
     IMemInputPin *m_pImp;
     IMemAllocator *m_pAll;
     AM_MEDIA_TYPE m_pOurType, m_pDestType;
-    MPEG2VIDEOINFO m_mp2vi;
+    BYTE *m_vinfo;
     VIDEOINFOHEADER m_vi;
     VIDEOINFOHEADER2 m_vi2;
 };
