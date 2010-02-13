@@ -61,6 +61,9 @@ public:
         if (m_pOutputPin) m_pOutputPin->Release();
         if (m_pFilter) m_pFilter->Release();
 
+        if (m_pSFilter) m_pSFilter->Release();
+        if (m_pRFilter) m_pRFilter->Release();
+
         if (m_pMC) m_pMC->Release();
         if (m_pGraph) m_pGraph->Release();
     }
@@ -329,6 +332,9 @@ public:
         m_pOurInput = (CSenderPin *) m_pSFilter->GetPin(0);
         m_pRFilter = new CRenderFilter();
         m_pOurOutput = (CRenderPin *) m_pRFilter->GetPin(0);
+
+        m_pSFilter->AddRef();
+        m_pRFilter->AddRef();
 
         if (buildgraph)
         {
