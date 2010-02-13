@@ -33,14 +33,60 @@ HRESULT CSenderPin::DecideBufferSize(IMemAllocator *pAlloc, ALLOCATOR_PROPERTIES
     return S_OK;
 }
 
-CSenderFilter::CSenderFilter() : CBaseFilter(NAME("CSenderFilter"), NULL, &m_csFilter, GUID_NULL)
+CSenderFilter::CSenderFilter() : CBaseFilter(NAME("CSenderFilter"), NULL, &m_csFilter, GUID_NULL), m_pFileName(NULL)
 {
     m_pin = new CSenderPin(&m_hr, this, &m_csFilter);
+}
+
+CSenderFilter::~CSenderFilter()
+{
+    delete m_pin;
+    if (m_pFileName) delete m_pFileName;
+}
+
+HRESULT CSenderFilter::NonDelegatingQueryInterface(REFIID riid, void **ppv)
+{
+    if (riid == IID_IFileSourceFilter)
+        return GetInterface((IFileSourceFilter *) this, ppv);
+    else
+        return CBaseFilter::NonDelegatingQueryInterface(riid, ppv);
+}
+
+HRESULT CSenderFilter::Load(LPCOLESTR pszFileName, const AM_MEDIA_TYPE *pmt)
+{
+    if (pszFileName)
+    {
+        if (m_pFileName) delete m_pFileName;
+        size_t len = lstrlenW(pszFileName) + 1;
+        m_pFileName = new OLECHAR[len];
+        memcpy(m_pFileName, pszFileName, sizeof(OLECHAR) * len);
+    }
+    return S_OK;
+}
+
+HRESULT CSenderFilter::GetCurFile(LPOLESTR *ppszFileName, AM_MEDIA_TYPE *pmt)
+{
+    if (m_pFileName)
+    {
+        size_t len = lstrlenW(m_pFileName) + 1;
+        *ppszFileName = (LPOLESTR) CoTaskMemAlloc(sizeof(OLECHAR) * len);
+        memcpy(*ppszFileName, m_pFileName, sizeof(OLECHAR) * len);
+    }
+
+    if (pmt)
+    {
+        memset(pmt, 0, sizeof(AM_MEDIA_TYPE));
+        pmt->majortype = MEDIATYPE_NULL;
+        pmt->subtype = MEDIASUBTYPE_NULL;
+    }
+
+    return S_OK;
 }
 
 CRenderPin::CRenderPin(HRESULT *phr, CRenderFilter *pFilter, CCritSec *pLock) : m_gPtr(NULL), m_refstart(-1LL << 63), CBaseInputPin(NAME("CRenderPin"), pFilter, pLock, phr, L"Render")
 {
 }
+
 
 HRESULT CRenderPin::Receive(IMediaSample *pSample)
 {

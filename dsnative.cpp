@@ -22,20 +22,29 @@
 class DSVideoCodec
 {
 public:
-    DSVideoCodec::DSVideoCodec(const char *filename, const GUID guid, BITMAPINFOHEADER *bih, unsigned int outfmt) :
+    DSVideoCodec::DSVideoCodec(const char *cfname, const GUID guid, BITMAPINFOHEADER *bih, unsigned int outfmt, const char *sfname) :
       m_guid(guid), m_bih(bih), m_hDll(NULL), m_outfmt(outfmt), m_vinfo(NULL), m_discontinuity(1), m_pFilter(NULL),
       m_pInputPin(NULL), m_pOutputPin(NULL), m_pOurInput(NULL), m_pOurOutput(NULL),
-      m_pImp(NULL), m_pAll(NULL), m_pSFilter(NULL), m_pRFilter(NULL), m_pGraph(NULL), m_pMC(NULL)
+      m_pImp(NULL), m_pAll(NULL), m_pSFilter(NULL), m_pRFilter(NULL), m_pGraph(NULL), m_pMC(NULL), m_sfname(NULL)
     {
-        strncpy(m_fname, filename, MAX_PATH);
+        strncpy(m_cfname, cfname, MAX_PATH);
+        if (sfname)
+        {
+            int len = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, sfname, -1, NULL, 0);
+            if (len > 0)
+            {
+                m_sfname = new wchar_t[len];
+                MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, sfname, -1, m_sfname, len);
+            }
+        }
     }
 
     DSVideoCodec::~DSVideoCodec()
     {
         ReleaseGraph();
         if (m_vinfo) delete m_vinfo;
-        if (m_hDll)
-            FreeLibrary(m_hDll);
+        if (m_sfname) delete m_sfname;
+        if (m_hDll) FreeLibrary(m_hDll);
     }
 
     void ReleaseGraph(void)
@@ -58,7 +67,7 @@ public:
 
     BOOL LoadLibrary(void)
     {
-        return ((m_hDll = ::LoadLibrary(m_fname)) != NULL);
+        return ((m_hDll = ::LoadLibrary(m_cfname)) != NULL);
     }
 
     BOOL CreateFilter(void)
@@ -305,7 +314,7 @@ public:
         return DSN_OK;
     }
 
-    dsnerror_t CreateGraph(bool buildgraph=false)
+    dsnerror_t CreateGraph(bool buildgraph=true)
     {
         if (!EnumPins())
             return DSN_FAIL_ENUM;
@@ -314,6 +323,9 @@ public:
             return DSN_INPUT_NOTACCEPTED;
 
         m_pSFilter = new CSenderFilter();
+        /* setup Source filename if someone wants to known it (i.e. ffdshow) */
+        m_pSFilter->Load(m_sfname, NULL);
+
         m_pOurInput = (CSenderPin *) m_pSFilter->GetPin(0);
         m_pRFilter = new CRenderFilter();
         m_pOurOutput = (CRenderPin *) m_pRFilter->GetPin(0);
@@ -512,7 +524,8 @@ public:
 private:
     HMODULE m_hDll;
     GUID m_guid;
-    char m_fname[MAX_PATH + 1];
+    char m_cfname[MAX_PATH + 1];
+    wchar_t *m_sfname;
     unsigned int m_outfmt;
     int m_discontinuity;
     HRESULT m_res;
@@ -540,9 +553,10 @@ private:
 };
 
 
-extern "C" DSVideoCodec * WINAPI DSOpenVideoCodec(const char *dll, const GUID guid, BITMAPINFOHEADER* bih, unsigned int outfmt, dsnerror_t *err)
+extern "C" DSVideoCodec * WINAPI DSOpenVideoCodec(const char *dll, const GUID guid, BITMAPINFOHEADER* bih,
+                                                  unsigned int outfmt, const char *filename, dsnerror_t *err)
 {
-    DSVideoCodec *vcodec = new DSVideoCodec(dll, guid, bih, outfmt);
+    DSVideoCodec *vcodec = new DSVideoCodec(dll, guid, bih, outfmt, filename);
     dsnerror_t res = DSN_OK;
 
     if (!vcodec->LoadLibrary())

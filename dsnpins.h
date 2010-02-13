@@ -31,18 +31,26 @@ public:
     HRESULT STDMETHODCALLTYPE EndFlush(void) { return E_NOTIMPL; }
 };
 
-class CSenderFilter: public CBaseFilter
+class CSenderFilter: public CBaseFilter, public IFileSourceFilter
 {
 public:
+
+    DECLARE_IUNKNOWN
+
     CSenderFilter::CSenderFilter();
-    CSenderFilter::~CSenderFilter() { delete m_pin; }
+    CSenderFilter::~CSenderFilter();
     int GetPinCount() { return 1; }
     CBasePin *GetPin(int n) { return m_pin; }
+
+    HRESULT STDMETHODCALLTYPE Load(LPCOLESTR pszFileName, const AM_MEDIA_TYPE *pmt);
+    HRESULT STDMETHODCALLTYPE GetCurFile(LPOLESTR *ppszFileName, AM_MEDIA_TYPE *pmt);
+    STDMETHODIMP NonDelegatingQueryInterface(REFIID riid, void **ppv);
 
 private:
     CSenderPin *m_pin;
     HRESULT m_hr;
     CCritSec m_csFilter;
+    LPOLESTR m_pFileName;
 };
 
 class CRenderFilter;
