@@ -49,7 +49,15 @@ public:
 
     void ReleaseGraph(void)
     {
-        if (m_pMC) m_pMC->Stop();
+        
+        if (m_pMC)
+            m_pMC->Stop();
+        else if (m_pFilter)
+        {
+            m_pFilter->Stop();
+            m_pFilter->JoinFilterGraph(NULL, NULL);
+        }
+
         if (m_pGraph) RemoveFromRot(m_dwRegister);
 
         /* binary codec */
@@ -317,7 +325,7 @@ public:
         return DSN_OK;
     }
 
-    dsnerror_t CreateGraph(bool buildgraph=true)
+    dsnerror_t CreateGraph(bool buildgraph=false)
     {
         if (!EnumPins())
             return DSN_FAIL_ENUM;
@@ -350,8 +358,12 @@ public:
             DSN_CHECK(m_pGraph->ConnectDirect(m_pOurInput, m_pInputPin, &m_pOurType), DSN_INPUT_CONNFAILED);
         }
         else
-             /* same of above */
+        {
+            /* provide a fake graph */
+            m_res = m_pFilter->JoinFilterGraph((IFilterGraph *) m_pSFilter, L"DSNative Fake Graph");
+            /* same of above */
             DSN_CHECK(m_pInputPin->ReceiveConnection(m_pOurInput, &m_pOurType), DSN_INPUT_CONNFAILED);
+        }
 
         SetOutputType();
 

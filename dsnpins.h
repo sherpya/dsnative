@@ -31,7 +31,7 @@ public:
     HRESULT STDMETHODCALLTYPE EndFlush(void) { return E_NOTIMPL; }
 };
 
-class CSenderFilter: public CBaseFilter, public IFileSourceFilter
+class CSenderFilter: public CBaseFilter, public IFileSourceFilter, public IFilterGraph
 {
 public:
 
@@ -42,9 +42,21 @@ public:
     int GetPinCount() { return 1; }
     CBasePin *GetPin(int n) { return m_pin; }
 
+    STDMETHODIMP NonDelegatingQueryInterface(REFIID riid, void **ppv);
+
+    /* IFileSourceFilter */
     HRESULT STDMETHODCALLTYPE Load(LPCOLESTR pszFileName, const AM_MEDIA_TYPE *pmt);
     HRESULT STDMETHODCALLTYPE GetCurFile(LPOLESTR *ppszFileName, AM_MEDIA_TYPE *pmt);
-    STDMETHODIMP NonDelegatingQueryInterface(REFIID riid, void **ppv);
+
+    /* IFilterGraph */
+    HRESULT STDMETHODCALLTYPE AddFilter(IBaseFilter *pFilter, LPCWSTR pName) { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE RemoveFilter(IBaseFilter *pFilter) { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE EnumFilters(IEnumFilters **ppEnum) { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE FindFilterByName(LPCWSTR pName, IBaseFilter **ppFilter) { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE SetDefaultSyncSource(void) { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE ConnectDirect(IPin *ppinOut, IPin *ppinIn, const AM_MEDIA_TYPE *pmt) { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE Reconnect(IPin *ppin) { return E_NOTIMPL; }
+    HRESULT STDMETHODCALLTYPE Disconnect(IPin *ppin) { return E_NOTIMPL; }
 
 private:
     CSenderPin *m_pin;

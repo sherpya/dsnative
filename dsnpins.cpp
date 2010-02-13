@@ -48,6 +48,8 @@ HRESULT CSenderFilter::NonDelegatingQueryInterface(REFIID riid, void **ppv)
 {
     if (riid == IID_IFileSourceFilter)
         return GetInterface((IFileSourceFilter *) this, ppv);
+    else if (riid == IID_IGraphBuilder)
+        return GetInterface((IFilterGraph *) this, ppv);
     else
         return CBaseFilter::NonDelegatingQueryInterface(riid, ppv);
 }
@@ -83,10 +85,10 @@ HRESULT CSenderFilter::GetCurFile(LPOLESTR *ppszFileName, AM_MEDIA_TYPE *pmt)
     return S_OK;
 }
 
+
 CRenderPin::CRenderPin(HRESULT *phr, CRenderFilter *pFilter, CCritSec *pLock) : m_gPtr(NULL), m_refstart(-1LL << 63), CBaseInputPin(NAME("CRenderPin"), pFilter, pLock, phr, L"Render")
 {
 }
-
 
 HRESULT CRenderPin::Receive(IMediaSample *pSample)
 {
