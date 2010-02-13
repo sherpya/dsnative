@@ -524,7 +524,7 @@ public:
         unsigned int bits = m_outfmt & 0xff;
         unsigned int check = m_outfmt ^ bits;
 
-        if (check == mmioFOURCC(0, 'B', 'G', 'R'))
+        if ((check == mmioFOURCC(0, 'B', 'G', 'R')) || (check == mmioFOURCC(0, 'R', 'G', 'B')))
         {
             *biBitCount = bits;
             switch (bits)
