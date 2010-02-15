@@ -6,3 +6,4 @@ DSVideoDecode
 DSVideoResync
 DSStrError
 DSShowPropertyPage
+DSGetApiVersion

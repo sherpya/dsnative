@@ -612,6 +612,12 @@ extern "C" BOOL WINAPI DSShowPropertyPage(DSVideoCodec *codec)
     return codec->ShowPropertyPage();
 }
 
+extern "C" unsigned int WINAPI DSGetApiVersion(void)
+{
+    return DSN_API_VERSION;
+}
+
+
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved)
 {
     switch (reason)

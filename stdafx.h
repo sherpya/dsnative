@@ -45,5 +45,7 @@
 
 #include <commctrl.h>
 
+#include "dsnative.h"
 #include "dsnerror.h"
 #include "dsnpins.h"
+

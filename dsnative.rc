@@ -1,10 +1,11 @@
 #include <windows.h>
+#include "dsnative.h"
 
 LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 
 VS_VERSION_INFO VERSIONINFO
-	FILEVERSION 0,0,0,1
-	PRODUCTVERSION 0,0,0,1
+	FILEVERSION DSN_DLL_VERSION
+	PRODUCTVERSION DSN_DLL_VERSION
 	FILEFLAGSMASK 0x17L
 #ifdef _DEBUG
 	FILEFLAGS 0x1L
@@ -20,12 +21,13 @@ BEGIN
 		BLOCK "00000409"
 		BEGIN
 			VALUE "FileDescription", "Direct Show Native Wrapper"
-			VALUE "FileVersion", "0, 0, 0, 1"
+			VALUE "FileVersion", DSN_STRINGIFY(DSN_DLL_VERSION)
 			VALUE "InternalName", "dsnative.dll"
 			VALUE "LegalCopyright", "Copyright (C) 2010 Gianluigi Tiesi"
 			VALUE "OriginalFilename", "dsnative.dll"
 			VALUE "ProductName", "Direct Show Native Wrapper"
-			VALUE "ProductVersion", "0, 0, 0, 1"
+			VALUE "ProductVersion", DSN_STRINGIFY(DSN_DLL_VERSION)
+			VALUE "APIVersion", DSN_STRINGIFY(DSN_API_VERSION)
 		END
 	END
 	BLOCK "VarFileInfo"
