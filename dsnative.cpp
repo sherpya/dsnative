@@ -420,7 +420,7 @@ public:
     dsnerror_t Decode(const BYTE *src, int size, double pts, double *newpts, BYTE *pImage)
     {
         IMediaSample* sample = NULL;
-        REFERENCE_TIME start = (REFERENCE_TIME) (pts * 1E9);
+        REFERENCE_TIME start = PTS2RT(pts);
         REFERENCE_TIME stoptime = start + 1;
         BYTE *ptr;
 
@@ -439,7 +439,7 @@ public:
         DSN_CHECK(m_pImp->Receive(sample), DSN_FAIL_RECEIVE);
         sample->Release();
 
-        *newpts = (double) (m_pOurOutput->GetPTS() / 1E9);
+        *newpts = RT2PTS(m_pOurOutput->GetPTS());
         return DSN_OK;
     }
 
