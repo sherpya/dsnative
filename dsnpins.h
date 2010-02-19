@@ -90,7 +90,7 @@ class CRenderFilter: public CBaseFilter
 {
 public:
     CRenderFilter::CRenderFilter();
-    CRenderFilter::~CRenderFilter() { delete m_pin; }
+    CRenderFilter::~CRenderFilter();
     int GetPinCount() { return 1; }
     CBasePin *GetPin(int n) { return m_pin; }
 

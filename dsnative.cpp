@@ -49,31 +49,38 @@ public:
 
     void ReleaseGraph(void)
     {
-        
-        if (m_pMC)
-            m_pMC->Stop();
+        DebugBreak();
+        if (m_pMC) m_res = m_pMC->Stop();
         else if (m_pFilter)
+            m_res = m_pFilter->Stop();
+
+        /*
+            if (m_pAll) m_res = m_pAll->Release();
+            if (m_pImp) m_res = m_pImp->Release();
+        */
+
+        if (m_pGraph)
         {
-            m_pFilter->Stop();
-            m_pFilter->JoinFilterGraph(NULL, NULL);
+            if (m_pFilter)
+            {
+                ASSERT(m_pSFilter);
+                ASSERT(m_pRFilter);
+                m_res = m_pGraph->RemoveFilter(m_pFilter);
+                m_res = m_pGraph->RemoveFilter(m_pSFilter);
+                m_res = m_pGraph->RemoveFilter(m_pRFilter);
+            }
+            RemoveFromRot(m_dwRegister);
         }
+        else
+        {
+            if (m_pInputPin) m_res = m_pInputPin->Disconnect();
+            if (m_pOutputPin) m_res = m_pOutputPin->Disconnect();
+        }
+        
+        if (m_pFilter) m_res = m_pFilter->Release();
 
-        if (m_pGraph) RemoveFromRot(m_dwRegister);
-
-        /* binary codec */
-        if (m_pAll) m_pAll->Release();
-        if (m_pImp) m_pImp->Release();
-        if (m_pInputPin) m_pInputPin->Disconnect();
-        if (m_pOutputPin) m_pOutputPin->Disconnect();
-        if (m_pInputPin) m_pInputPin->Release();
-        if (m_pOutputPin) m_pOutputPin->Release();
-        if (m_pFilter) m_pFilter->Release();
-
-        if (m_pSFilter) m_pSFilter->Release();
-        if (m_pRFilter) m_pRFilter->Release();
-
-        if (m_pMC) m_pMC->Release();
-        if (m_pGraph) m_pGraph->Release();
+        /* if (m_pMC) m_res = m_pMC->Release(); */
+        if (m_pGraph) m_res = m_pGraph->Release();
     }
 
     BOOL LoadLibrary(void)
@@ -296,7 +303,9 @@ public:
                 m_pInputPin = pin;
             else if (!m_pOutputPin && (pInfo.dir == PINDIR_OUTPUT))
                 m_pOutputPin = pin;
+
             pin->Release();
+            m_pFilter->Release();
         }
 
         enumpins->Release();
@@ -341,9 +350,6 @@ public:
         m_pRFilter = new CRenderFilter();
         m_pOurOutput = (CRenderPin *) m_pRFilter->GetPin(0);
 
-        m_pSFilter->AddRef();
-        m_pRFilter->AddRef();
-
         if (buildgraph)
         {
             DSN_CHECK(CoCreateInstance(CLSID_FilterGraph, NULL, CLSCTX_INPROC_SERVER, IID_IGraphBuilder, (void **) &m_pGraph), DSN_FAIL_GRAPH);
@@ -351,19 +357,15 @@ public:
             DSN_CHECK(m_pGraph->QueryInterface(IID_IMediaControl, (void **) &m_pMC), DSN_FAIL_GRAPH);
 
             m_pGraph->SetLogFile((DWORD_PTR) GetStdHandle(STD_OUTPUT_HANDLE));
+            DSN_CHECK(m_pGraph->AddFilter(m_pFilter, L"Binary Codec"), (m_pInputPin = m_pOutputPin = NULL, DSN_FAIL_GRAPH));
             DSN_CHECK(m_pGraph->AddFilter(m_pSFilter, L"DS Sender"), DSN_FAIL_GRAPH);
             DSN_CHECK(m_pGraph->AddFilter(m_pRFilter, L"DS Render"), DSN_FAIL_GRAPH);
-            DSN_CHECK(m_pGraph->AddFilter(m_pFilter, L"Binary Codec"), DSN_FAIL_GRAPH);
             // Connect our output pin to codec input pin otherwise QueryAccept on the codec output pin will fail
             DSN_CHECK(m_pGraph->ConnectDirect(m_pOurInput, m_pInputPin, &m_pOurType), DSN_INPUT_CONNFAILED);
         }
         else
-        {
-            /* provide a fake graph */
-            m_res = m_pFilter->JoinFilterGraph((IFilterGraph *) m_pSFilter, L"DSNative Fake Graph");
             /* same of above */
             DSN_CHECK(m_pInputPin->ReceiveConnection(m_pOurInput, &m_pOurType), DSN_INPUT_CONNFAILED);
-        }
 
         SetOutputType();
 
@@ -625,6 +627,14 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved)
         case DLL_PROCESS_ATTACH:
         {
             DisableThreadLibraryCalls(hModule);
+#ifdef _DEBUG
+        	DbgInitialise(hModule);
+	        DbgSetModuleLevel(LOG_TRACE,5);
+	        DbgSetModuleLevel(LOG_MEMORY,5);
+	        DbgSetModuleLevel(LOG_ERROR,5);
+	        DbgSetModuleLevel(LOG_TIMING,5);
+	        DbgSetModuleLevel(LOG_LOCKING,5);
+#endif
             return (OleInitialize(NULL) == S_OK);
         }
         case DLL_THREAD_ATTACH:

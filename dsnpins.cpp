@@ -105,3 +105,9 @@ CRenderFilter::CRenderFilter() : CBaseFilter(NAME("CRenderFilter"), NULL, &m_csF
 {
     m_pin = new CRenderPin(&m_hr, this, &m_csFilter);
 }
+
+CRenderFilter::~CRenderFilter()
+{
+    delete m_pin;
+}
+
