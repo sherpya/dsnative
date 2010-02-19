@@ -54,11 +54,6 @@ public:
         else if (m_pFilter)
             m_res = m_pFilter->Stop();
 
-        /*
-            if (m_pAll) m_res = m_pAll->Release();
-            if (m_pImp) m_res = m_pImp->Release();
-        */
-
         if (m_pGraph)
         {
             if (m_pFilter)
@@ -75,12 +70,13 @@ public:
         {
             if (m_pInputPin) m_res = m_pInputPin->Disconnect();
             if (m_pOutputPin) m_res = m_pOutputPin->Disconnect();
+            m_res = m_pFilter->JoinFilterGraph(NULL, NULL);
         }
-        
-        if (m_pFilter) m_res = m_pFilter->Release();
 
-        /* if (m_pMC) m_res = m_pMC->Release(); */
-        if (m_pGraph) m_res = m_pGraph->Release();
+        if (m_pImp) m_pImp->Release();
+        if (m_pFilter) m_res = m_pFilter->Release();
+        if (m_pSFilter) m_res = m_pSFilter->Release();
+        if (m_pRFilter) m_res = m_pRFilter->Release();
     }
 
     BOOL LoadLibrary(void)
@@ -343,12 +339,14 @@ public:
             return DSN_INPUT_NOTACCEPTED;
 
         m_pSFilter = new CSenderFilter();
+        m_pOurInput = (CSenderPin *) m_pSFilter->GetPin(0);
         /* setup Source filename if someone wants to known it (i.e. ffdshow) */
         m_pSFilter->Load(m_sfname, NULL);
+        m_pSFilter->AddRef();
 
-        m_pOurInput = (CSenderPin *) m_pSFilter->GetPin(0);
         m_pRFilter = new CRenderFilter();
         m_pOurOutput = (CRenderPin *) m_pRFilter->GetPin(0);
+        m_pRFilter->AddRef();
 
         if (buildgraph)
         {
@@ -364,8 +362,11 @@ public:
             DSN_CHECK(m_pGraph->ConnectDirect(m_pOurInput, m_pInputPin, &m_pOurType), DSN_INPUT_CONNFAILED);
         }
         else
+        {
+            m_res = m_pFilter->JoinFilterGraph((IFilterGraph *) m_pSFilter, L"DSNative Graph");
             /* same of above */
             DSN_CHECK(m_pInputPin->ReceiveConnection(m_pOurInput, &m_pOurType), DSN_INPUT_CONNFAILED);
+        }
 
         SetOutputType();
 
