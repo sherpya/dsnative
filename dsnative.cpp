@@ -49,7 +49,6 @@ public:
 
     void ReleaseGraph(void)
     {
-        DebugBreak();
         if (m_pMC) m_res = m_pMC->Stop();
         else if (m_pFilter)
             m_res = m_pFilter->Stop();
