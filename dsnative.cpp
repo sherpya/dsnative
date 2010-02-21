@@ -402,7 +402,7 @@ public:
             return E_FAIL;
 
         WCHAR wsz[256];
-        StringCchPrintfW(wsz, 256, L"FilterGraph %08x pid %08x", (DWORD_PTR) pUnkGraph, GetCurrentProcessId());
+        StringCchPrintfW(wsz, 256, L"FilterGraph %08x pid %08x (dsnative)", (DWORD_PTR) pUnkGraph, GetCurrentProcessId());
         HRESULT hr = CreateItemMoniker(L"!", wsz, &pMoniker);
         if (SUCCEEDED(hr))
         {
