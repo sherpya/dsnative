@@ -201,6 +201,7 @@ public:
         m_pOurType.lSampleSize = 1;
         m_pOurType.pUnk = NULL;
 
+        /* ffdshow (and others ?) needs AVC1 as fourcc for avc video */
         if (isAVC(m_bih->biCompression))
             m_pOurType.subtype.Data1 = mmioFOURCC('A', 'V', 'C', '1');
         else
