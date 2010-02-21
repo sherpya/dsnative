@@ -294,7 +294,7 @@ public:
                     int len = ((src[0] << 8) | src[1]) + 2;
                     if(src + len > src_end || dst + len > dst_end) { ASSERT(0); break; }
                     memcpy(dst, src, len);
-                    src += len; 
+                    src += len;
                     dst += len;
                     try_mp2vi->cbSequenceHeader += len;
                 }
