@@ -172,25 +172,46 @@ public:
         return (m_res == S_OK) ? DSN_OK : DSN_OUTPUT_NOTACCEPTED;
     }
 
+    BOOL isAVC(DWORD biCompression)
+    {
+        switch (biCompression)
+        {
+            case mmioFOURCC('H', '2', '6', '4'):
+            case mmioFOURCC('h', '2', '6', '4'):
+            case mmioFOURCC('X', '2', '6', '4'):
+            case mmioFOURCC('x', '2', '6', '4'):
+            case mmioFOURCC('A', 'V', 'C', '1'):
+            case mmioFOURCC('a', 'v', 'c', '1'):
+            case mmioFOURCC('d', 'a', 'v', 'c'):
+            case mmioFOURCC('D', 'A', 'V', 'C'):
+            case mmioFOURCC('V', 'S', 'S', 'H'):
+                return TRUE;
+        }
+        return FALSE;
+    }
+
     BOOL SetInputType(void)
     {
         ULONG cbFormat;
 
         m_pOurType.majortype = MEDIATYPE_Video;
         m_pOurType.subtype = MEDIATYPE_Video;
-        m_pOurType.subtype.Data1 = m_bih->biCompression;
         m_pOurType.bFixedSizeSamples = FALSE;
         m_pOurType.bTemporalCompression = TRUE;
         m_pOurType.lSampleSize = 1;
         m_pOurType.pUnk = NULL;
+
+        if (isAVC(m_bih->biCompression))
+            m_pOurType.subtype.Data1 = mmioFOURCC('A', 'V', 'C', '1');
+        else
+            m_pOurType.subtype.Data1 = m_bih->biCompression;
 
         // probe FORMAT_MPEG2Video
         // this is done before FORMAT_VideoInfo because e.g. coreavc will accept anyway the format
         // but it will decode black frames
 
         int extra = m_bih->biSize - sizeof(BITMAPINFOHEADER);
-        // The '4' is from the allocated space of dwSequenceHeader
-        cbFormat = sizeof(MPEG2VIDEOINFO) + extra - 4;
+        cbFormat = FIELD_OFFSET(MPEG2VIDEOINFO, dwSequenceHeader) + extra - 7;
 
         MPEG2VIDEOINFO *try_mp2vi = (MPEG2VIDEOINFO *) new BYTE[cbFormat];
         m_vinfo = (BYTE *) try_mp2vi;
@@ -204,13 +225,36 @@ public:
         try_mp2vi->hdr.dwPictAspectRatioY = m_bih->biHeight;
         memcpy(&try_mp2vi->hdr.bmiHeader, m_bih, sizeof(BITMAPINFOHEADER));
         try_mp2vi->hdr.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        try_mp2vi->hdr.bmiHeader.biCompression = m_pOurType.subtype.Data1;
 
+        /* From MPC-HC */
         if (extra > 0)
         {
-            BYTE *extradata = (BYTE *) m_bih + sizeof(BITMAPINFOHEADER) + 4;
-            try_mp2vi->dwFlags = (*extradata & 0x3) + 1;
-            /* printf("NALU length field size %d\n", m_mp2vi.dwFlags); */
-            try_mp2vi->cbSequenceHeader = avc_quant((BYTE *)(m_bih) + sizeof(BITMAPINFOHEADER), (BYTE *)(&try_mp2vi->dwSequenceHeader[0]), extra);
+            BYTE *extradata = (BYTE *) m_bih + sizeof(BITMAPINFOHEADER);
+            try_mp2vi->dwProfile = extradata[1];
+            try_mp2vi->dwLevel = extradata[3];
+            try_mp2vi->dwFlags = (extradata[4] & 3) + 1;
+
+            try_mp2vi->cbSequenceHeader = 0;
+
+            BYTE* src = (BYTE *) extradata + 5;
+            BYTE* dst = (BYTE *) try_mp2vi->dwSequenceHeader;
+
+            BYTE* src_end = (BYTE *) extradata + extra;
+            BYTE* dst_end = (BYTE *) try_mp2vi->dwSequenceHeader + extra;
+
+            for (int i = 0; i < 2; i++)
+            {
+                for (int n = *src++ & 0x1f; n > 0; n--)
+                {
+                    int len = ((src[0] << 8) | src[1]) + 2;
+                    if(src + len > src_end || dst + len > dst_end) { ASSERT(0); break; }
+                    memcpy(dst, src, len);
+                    src += len; 
+                    dst += len;
+                    try_mp2vi->cbSequenceHeader += len;
+                }
+            }
         }
 
         m_pOurType.formattype = FORMAT_MPEG2Video;
@@ -246,34 +290,6 @@ public:
         delete m_vinfo;
         m_vinfo = NULL;
         return FALSE;
-    }
-
-    DWORD avc_quant(BYTE *src, BYTE *dst, int len)
-    {
-        // Stolen from libavcodec h264.c
-        BYTE *p = src, *d = dst;
-        int cnt;
-
-        cnt = *(p + 5) & 0x1f; // Number of sps
-
-        if (src[0] != 0x01 || cnt > 1)
-        {
-            memcpy(dst, src, len);
-            return len;
-        }
-        p += 6;
-
-        // cnt > 1 not supported?
-        cnt = (*p << 8) | *(p + 1) + 2;
-        memcpy(d, p, cnt);
-        d += cnt;
-        p += cnt;
-
-        // assume pps cnt == 1 too
-        p++;
-        cnt = (*p << 8) | *(p + 1) + 2;
-        memcpy(d, p, cnt);
-        return (int) (d + cnt - dst);
     }
 
     BOOL EnumPins(void)
