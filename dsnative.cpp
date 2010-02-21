@@ -25,12 +25,23 @@ public:
     DSVideoCodec::DSVideoCodec(const char *cfname, const GUID guid, BITMAPINFOHEADER *bih, unsigned int outfmt, const char *sfname) :
       m_guid(guid), m_bih(bih), m_hDll(NULL), m_outfmt(outfmt), m_vinfo(NULL), m_discontinuity(1), m_pFilter(NULL),
       m_pInputPin(NULL), m_pOutputPin(NULL), m_pOurInput(NULL), m_pOurOutput(NULL),
-      m_pImp(NULL), m_pAll(NULL), m_pSFilter(NULL), m_pRFilter(NULL), m_pGraph(NULL), m_pMC(NULL), m_sfname(NULL)
+      m_pImp(NULL), m_pAll(NULL), m_pSFilter(NULL), m_pRFilter(NULL), m_pGraph(NULL), m_pMC(NULL), m_cfname(NULL), m_sfname(NULL)
     {
-        strncpy(m_cfname, cfname, MAX_PATH);
+        int len;
+
+        ASSERT(cfname);
+        ASSERT(bih);
+
+        len = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, cfname, -1, NULL, 0);
+        if (len > 0)
+        {
+            m_cfname = new wchar_t[len];
+            MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, cfname, -1, m_cfname, len);
+        }
+
         if (sfname)
         {
-            int len = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, sfname, -1, NULL, 0);
+            len = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, sfname, -1, NULL, 0);
             if (len > 0)
             {
                 m_sfname = new wchar_t[len];
@@ -42,8 +53,9 @@ public:
     DSVideoCodec::~DSVideoCodec()
     {
         ReleaseGraph();
-        if (m_vinfo) delete m_vinfo;
+        if (m_cfname) delete m_cfname;
         if (m_sfname) delete m_sfname;
+        if (m_vinfo) delete m_vinfo;
         if (m_hDll) FreeLibrary(m_hDll);
     }
 
@@ -80,7 +92,38 @@ public:
 
     BOOL LoadLibrary(void)
     {
-        return ((m_hDll = ::LoadLibrary(m_cfname)) != NULL);
+        HKEY hKey = NULL;
+
+        while ((m_hDll = ::LoadLibraryW(m_cfname)) == NULL)
+        {
+            /* Try picking path from the registry, if the codecs is registered in the system */
+            LONG size;
+            wchar_t subkey[61] = L"\\CLSID\\";
+            size = (sizeof(subkey) / 2) - 7;
+
+            if (StringFromGUID2(m_guid, subkey + 7, size) != 39)
+                break;
+
+            size -= 39;
+            wcsncat(subkey, L"\\InprocServer32", size);
+
+            if (RegOpenKeyW(HKEY_CLASSES_ROOT, subkey, &hKey) != ERROR_SUCCESS)
+                break;
+
+            if (RegQueryValueW(hKey, NULL, NULL, &size) != ERROR_SUCCESS)
+                break;
+
+            delete m_cfname;
+
+            m_cfname = new wchar_t[size];
+            if (RegQueryValueW(hKey, NULL, m_cfname, &size) == ERROR_SUCCESS)
+                m_hDll = ::LoadLibraryW(m_cfname);
+
+            break;
+        }
+
+        if (hKey) RegCloseKey(hKey);
+        return (m_hDll != NULL);
     }
 
     BOOL CreateFilter(void)
@@ -561,8 +604,7 @@ public:
 private:
     HMODULE m_hDll;
     GUID m_guid;
-    char m_cfname[MAX_PATH + 1];
-    wchar_t *m_sfname;
+    wchar_t *m_cfname, *m_sfname;
     unsigned int m_outfmt;
     int m_discontinuity;
     HRESULT m_res;
