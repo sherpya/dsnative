@@ -69,7 +69,7 @@ public:
         {
             if (m_pInputPin) m_res = m_pInputPin->Disconnect();
             if (m_pOutputPin) m_res = m_pOutputPin->Disconnect();
-            m_res = m_pFilter->JoinFilterGraph(NULL, NULL);
+            if (m_pFilter) m_res = m_pFilter->JoinFilterGraph(NULL, NULL);
         }
 
         if (m_pImp) m_pImp->Release();
