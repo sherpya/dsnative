@@ -472,10 +472,9 @@ public:
     BOOL StartGraph(void)
     {
         SetupAllocator();
-        if (m_pMC)
-            m_pMC->Run();
-        else
-            m_pFilter->Run(0);
+        if (m_pMC) m_pMC->Run();
+        else m_pFilter->Run(0);
+        Resync(0); // NewSegment + discontinuity /* e.g. ffdshow will not init byte count */
         return TRUE;
     }
 
