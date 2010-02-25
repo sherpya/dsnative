@@ -560,10 +560,12 @@ public:
             case mmioFOURCC('Y', 'U', 'Y', '2'):
                 m_pDestType.subtype = MEDIASUBTYPE_YUY2;
                 *biBitCount = 16;
+                *biPlanes = 1;
                 return TRUE;
             case mmioFOURCC('U', 'Y', 'V', 'Y'):
                 m_pDestType.subtype = MEDIASUBTYPE_UYVY;
                 *biBitCount = 16;
+                *biPlanes = 1;
                 return TRUE;
             case mmioFOURCC('Y', 'V', '1', '2'):
                 m_pDestType.subtype = MEDIASUBTYPE_YV12;
@@ -578,6 +580,12 @@ public:
             case mmioFOURCC('Y', 'V', 'U', '9'):
                 m_pDestType.subtype = MEDIASUBTYPE_YVU9;
                 *biBitCount = 9;
+                *biPlanes = 1;
+                return TRUE;
+            case mmioFOURCC('N', 'V', '1', '2'):
+                m_pDestType.subtype = MEDIASUBTYPE_NV12;
+                *biBitCount = 12;
+                *biPlanes = 2;
                 return TRUE;
         }
 
