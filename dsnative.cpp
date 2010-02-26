@@ -478,7 +478,7 @@ public:
         return TRUE;
     }
 
-    dsnerror_t Decode(const BYTE *src, int size, double pts, double *newpts, BYTE *pImage)
+    dsnerror_t Decode(const BYTE *src, int size, double pts, double *newpts, BYTE *pImage, int keyframe)
     {
         IMediaSample* sample = NULL;
         REFERENCE_TIME start = PTS2RT(pts);
@@ -491,7 +491,7 @@ public:
         DSN_CHECK(sample->GetPointer(&ptr), DSN_FAIL_DECODESAMPLE);
         memcpy(ptr, src, size);
         DSN_CHECK(sample->SetTime(&start, &stoptime), DSN_FAIL_DECODESAMPLE);
-        DSN_CHECK(sample->SetSyncPoint(0), DSN_FAIL_DECODESAMPLE);
+        DSN_CHECK(sample->SetSyncPoint(keyframe), DSN_FAIL_DECODESAMPLE);
         DSN_CHECK(sample->SetPreroll(pImage ? 0 : 1), DSN_FAIL_DECODESAMPLE);
         DSN_CHECK(sample->SetDiscontinuity(m_discontinuity), DSN_FAIL_DECODESAMPLE);
         m_discontinuity = 0;
@@ -665,9 +665,9 @@ extern "C" void WINAPI DSCloseVideoCodec(DSVideoCodec *vcodec)
     delete vcodec;
 }
 
-extern "C" dsnerror_t WINAPI DSVideoDecode(DSVideoCodec *vcodec, const BYTE *src, int size, double pts, double *newpts, BYTE *pImage)
+extern "C" dsnerror_t WINAPI DSVideoDecode(DSVideoCodec *vcodec, const BYTE *src, int size, double pts, double *newpts, BYTE *pImage, int keyframe)
 {
-    return vcodec->Decode(src, size, pts, newpts, pImage);
+    return vcodec->Decode(src, size, pts, newpts, pImage, keyframe);
 }
 
 extern "C" dsnerror_t WINAPI DSVideoResync(DSVideoCodec *vcodec, double pts)

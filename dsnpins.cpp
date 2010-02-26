@@ -94,9 +94,12 @@ HRESULT CRenderPin::Receive(IMediaSample *pSample)
 {
     BYTE *ptr;
     REFERENCE_TIME end;
-    pSample->GetPointer(&ptr);
     long len = pSample->GetActualDataLength();
-    memcpy(m_gPtr, ptr, len);
+    if (m_gPtr && (len > 0))
+    {
+        pSample->GetPointer(&ptr);
+        memcpy(m_gPtr, ptr, len);
+    }
     pSample->GetTime(&m_refstart, &end);
     return S_OK;
 }
