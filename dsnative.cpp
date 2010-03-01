@@ -82,6 +82,9 @@ public:
             if (m_pInputPin) m_res = m_pInputPin->Disconnect();
             if (m_pOutputPin) m_res = m_pOutputPin->Disconnect();
             if (m_pFilter) m_res = m_pFilter->JoinFilterGraph(NULL, NULL);
+
+            if (m_pOurInput) m_res = m_pOurOutput->Disconnect();
+            if (m_pOurOutput) m_res = m_pOurOutput->Disconnect();
         }
 
         if (m_pImp) m_pImp->Release();
@@ -434,6 +437,7 @@ public:
         else
             DSN_CHECK(m_pOutputPin->ReceiveConnection(m_pOurOutput, &m_pDestType), DSN_OUTPUT_CONNFAILED);
 
+        m_pOurOutput->SetFrameSize(m_vi.bmiHeader.biBitCount * m_vi.bmiHeader.biWidth * (m_vi.bmiHeader.biHeight + 2) / 8);
         return DSN_OK;
     }
 

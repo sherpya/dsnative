@@ -86,7 +86,7 @@ HRESULT CSenderFilter::GetCurFile(LPOLESTR *ppszFileName, AM_MEDIA_TYPE *pmt)
 }
 
 
-CRenderPin::CRenderPin(HRESULT *phr, CRenderFilter *pFilter, CCritSec *pLock) : m_gPtr(NULL), m_refstart(-1LL << 63), CBaseInputPin(NAME("CRenderPin"), pFilter, pLock, phr, L"Render")
+CRenderPin::CRenderPin(HRESULT *phr, CRenderFilter *pFilter, CCritSec *pLock) : m_gPtr(NULL), m_refstart(-1LL << 63), m_fSize(0), CBaseInputPin(NAME("CRenderPin"), pFilter, pLock, phr, L"Render")
 {
 }
 
@@ -95,10 +95,12 @@ HRESULT CRenderPin::Receive(IMediaSample *pSample)
     BYTE *ptr;
     REFERENCE_TIME end;
     long len = pSample->GetActualDataLength();
+
     if (m_gPtr && (len > 0))
     {
         pSample->GetPointer(&ptr);
-        memcpy(m_gPtr, ptr, len);
+        /* why the hell divxh264 returns huge sample len */
+        memcpy(m_gPtr, ptr, min(len, m_fSize));
     }
     pSample->GetTime(&m_refstart, &end);
     return S_OK;

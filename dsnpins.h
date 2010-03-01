@@ -80,10 +80,12 @@ public:
     HRESULT STDMETHODCALLTYPE EndFlush(void) { return E_NOTIMPL; }
 
     void SetPointer(BYTE *ptr) { m_gPtr = ptr; }
+    void SetFrameSize(long size) { m_fSize = size; }
 
 private:
     REFERENCE_TIME m_refstart;
     BYTE *m_gPtr;
+    long m_fSize;
 };
 
 class CRenderFilter: public CBaseFilter
