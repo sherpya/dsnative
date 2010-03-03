@@ -581,6 +581,13 @@ public:
                 *biBitCount = 12;
                 *biPlanes = 3;
                 return TRUE;
+            case mmioFOURCC('I', '4', '2', '0'):
+                /* Missing MEDIASUBTYPE_I420 in headers */
+                m_pDestType.subtype = MEDIATYPE_Video;
+                m_pDestType.subtype.Data1 = mmioFOURCC('I', '4', '2', '0');
+                *biBitCount = 12;
+                *biPlanes = 3;
+                return TRUE;
             case mmioFOURCC('Y', 'V', 'U', '9'):
                 m_pDestType.subtype = MEDIASUBTYPE_YVU9;
                 *biBitCount = 9;
