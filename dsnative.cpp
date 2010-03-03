@@ -666,7 +666,7 @@ extern "C" DSVideoCodec * WINAPI DSOpenVideoCodec(const char *dll, const GUID gu
     else if ((res = vcodec->CreateGraph()) == DSN_OK)
     {
         vcodec->StartGraph();
-        if (*err) *err = DSN_OK;
+        if (err) *err = DSN_OK;
         return vcodec;
     }
     delete vcodec;
