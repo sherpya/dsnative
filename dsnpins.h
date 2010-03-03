@@ -74,7 +74,7 @@ public:
     CRenderPin::CRenderPin(HRESULT *phr, CRenderFilter *pFilter, CCritSec *pLock);
     HRESULT CheckMediaType(const CMediaType *) { return S_OK; };
     HRESULT STDMETHODCALLTYPE Receive(IMediaSample *pSample);
-    REFERENCE_TIME GetPTS(void) { return m_refstart; }
+    REFERENCE_TIME GetPTS(void) { return m_reftime; }
 
     HRESULT STDMETHODCALLTYPE BeginFlush(void) { return E_NOTIMPL; }
     HRESULT STDMETHODCALLTYPE EndFlush(void) { return E_NOTIMPL; }
@@ -83,7 +83,7 @@ public:
     void SetFrameSize(long size) { m_fSize = size; }
 
 private:
-    REFERENCE_TIME m_refstart;
+    REFERENCE_TIME m_reftime;
     BYTE *m_gPtr;
     long m_fSize;
 };

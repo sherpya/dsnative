@@ -22,8 +22,8 @@
 class DSVideoCodec
 {
 public:
-    DSVideoCodec::DSVideoCodec(const char *cfname, const GUID guid, BITMAPINFOHEADER *bih, unsigned int outfmt, const char *sfname) :
-      m_guid(guid), m_bih(bih), m_hDll(NULL), m_outfmt(outfmt), m_vinfo(NULL), m_discontinuity(1), m_pFilter(NULL),
+    DSVideoCodec::DSVideoCodec(const char *cfname, const GUID guid, BITMAPINFOHEADER *bih, unsigned int outfmt, REFERENCE_TIME frametime, const char *sfname) :
+      m_guid(guid), m_bih(bih), m_hDll(NULL), m_outfmt(outfmt), m_frametime(frametime), m_vinfo(NULL), m_discontinuity(1), m_pFilter(NULL),
       m_pInputPin(NULL), m_pOutputPin(NULL), m_pOurInput(NULL), m_pOurOutput(NULL),
       m_pImp(NULL), m_pAll(NULL), m_pSFilter(NULL), m_pRFilter(NULL), m_pGraph(NULL), m_pMC(NULL), m_cfname(NULL), m_sfname(NULL)
     {
@@ -273,6 +273,7 @@ public:
         memcpy(&try_mp2vi->hdr.bmiHeader, m_bih, sizeof(BITMAPINFOHEADER));
         try_mp2vi->hdr.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
         try_mp2vi->hdr.bmiHeader.biCompression = m_pOurType.subtype.Data1;
+        try_mp2vi->hdr.AvgTimePerFrame = m_frametime;
 
         /* From MPC-HC */
         if (extra > 0)
@@ -326,6 +327,7 @@ public:
         try_vi->rcSource.right = m_bih->biWidth;
         try_vi->rcSource.bottom = m_bih->biHeight;
         try_vi->rcTarget = try_vi->rcSource;
+        try_vi->AvgTimePerFrame = m_frametime;
 
         m_pOurType.formattype = FORMAT_VideoInfo;
         m_pOurType.pbFormat = m_vinfo;
@@ -485,8 +487,8 @@ public:
     dsnerror_t Decode(const BYTE *src, int size, double pts, double *newpts, BYTE *pImage, int keyframe)
     {
         IMediaSample* sample = NULL;
-        REFERENCE_TIME start = PTS2RT(pts);
-        REFERENCE_TIME stoptime = start + 1;
+        REFERENCE_TIME start = PTS2RT(pts); /* sometimes I get x99999 instead of y00000 */
+        REFERENCE_TIME stoptime = start + m_frametime;
         BYTE *ptr;
 
         DSN_CHECK(m_pAll->GetBuffer(&sample, 0, 0, 0), DSN_FAIL_DECODESAMPLE);
@@ -626,6 +628,7 @@ private:
     unsigned int m_outfmt;
     int m_discontinuity;
     HRESULT m_res;
+    REFERENCE_TIME m_frametime;
     BITMAPINFOHEADER *m_bih;
     IBaseFilter *m_pFilter;
 
@@ -651,9 +654,9 @@ private:
 
 
 extern "C" DSVideoCodec * WINAPI DSOpenVideoCodec(const char *dll, const GUID guid, BITMAPINFOHEADER* bih,
-                                                  unsigned int outfmt, const char *filename, dsnerror_t *err)
+                                                  unsigned int outfmt, float fps, const char *filename, dsnerror_t *err)
 {
-    DSVideoCodec *vcodec = new DSVideoCodec(dll, guid, bih, outfmt, filename);
+    DSVideoCodec *vcodec = new DSVideoCodec(dll, guid, bih, outfmt, (REFERENCE_TIME) (1E7 / fps), filename);
     dsnerror_t res = DSN_OK;
 
     if (!vcodec->LoadLibrary())
@@ -683,7 +686,7 @@ extern "C" dsnerror_t WINAPI DSVideoDecode(DSVideoCodec *vcodec, const BYTE *src
 
 extern "C" dsnerror_t WINAPI DSVideoResync(DSVideoCodec *vcodec, double pts)
 {
-    return vcodec->Resync((REFERENCE_TIME) (pts * 1E9));
+    return vcodec->Resync(PTS2RT(pts));
 }
 
 extern "C" BOOL WINAPI DSShowPropertyPage(DSVideoCodec *codec)
