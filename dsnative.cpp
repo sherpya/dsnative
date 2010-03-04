@@ -512,7 +512,7 @@ public:
 
     dsnerror_t Resync(REFERENCE_TIME pts)
     {
-        m_res = m_pInputPin->NewSegment(pts, 0, 1);
+        m_res = m_pInputPin->NewSegment(pts, pts + m_frametime, 1.0);
         m_discontinuity = 1;
         return DSN_OK;
     }
